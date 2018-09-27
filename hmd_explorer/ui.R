@@ -57,8 +57,8 @@ shinyUI(fluidPage(
 
     # Show a plot of the generated distribution
     mainPanel(
-      tabsetPanel(
-        tabPanel("Mortality", 
+      tabsetPanel(id = "tabset_01",
+        tabPanel(title = "Mortality", 
         {
           plotlyOutput("mort_surface")
           plotlyOutput("mort_subplot")
