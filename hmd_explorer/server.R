@@ -67,16 +67,32 @@ shinyServer(function(input, output) {
 
     dta_ss <- full_data %>% 
       filter(code == input$code_select) %>% 
-      filter(gender == input$gender_select) %>% 
+      filter(gender == input$gender_select) 
+
+
+    if(input$limit_age){
+      dta_ss <- dta_ss %>% 
+        filter(Age >= input$age_limits[1], Age <= input$age_limits[2])
+    }    
+    if (input$limit_period){
+      dta_ss <- dta_ss %>% 
+        filter(Year >= input$period_limits[1], Year <= input$period_limits[2])
+    }
+    
+    dta_ss <- dta_ss %>% 
       group_by(code, gender) %>% 
       nest()
     
     z_list <- dta_ss %>% 
       mutate(lmr_list = map(data, make_z_list, adjust = 0.5))
     
+    
     xx <- z_list[["lmr_list"]][[1]][["age"]]
     yy <- z_list[["lmr_list"]][[1]][["year"]]
     zz <- 10^z_list[["lmr_list"]][[1]][["vals"]]
+    
+    n_ages <- length(xx)
+    n_years <- length(yy)
     
     zc <- z_list[["lmr_list"]][[1]][["vals"]]
     p <-   plot_ly(
@@ -101,6 +117,9 @@ shinyServer(function(input, output) {
           ),
           yaxis = list(
             title = "Year"
+          ),
+          aspectratio = list(
+            x = n_ages / n_years, y = 1, z = 0.5
           )
         )
       )
@@ -118,7 +137,7 @@ shinyServer(function(input, output) {
       this_cohort = this_year - this_age
 
       p1 <- full_data %>%
-        filter(Age <=90) %>%
+        filter(Age <=100) %>%
         filter(code == input$code_select) %>%
         filter(gender == input$gender_select) %>%
         filter(Age == this_age) %>%
@@ -127,7 +146,7 @@ shinyServer(function(input, output) {
         add_lines()
        
       p2 <- full_data %>%
-        filter(Age <=90) %>%
+        filter(Age <=100) %>%
         filter(code == input$code_select) %>%
         filter(gender == input$gender_select) %>%
         filter(Year == this_year) %>%
@@ -136,7 +155,7 @@ shinyServer(function(input, output) {
         add_lines()
 
       p3 <- full_data %>%
-        filter(Age <=90) %>%
+        filter(Age <=100) %>%
         filter(code == input$code_select) %>%
         filter(gender == input$gender_select) %>%
         mutate(birth_cohort = Year - Age) %>%
