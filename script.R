@@ -84,7 +84,8 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
   out <- list(age = ages, year = years, vals = val_mtrx)
 }
 
-joined_data %>% 
+joined_data %>%
+  filter(Age <= 90) %>% 
   group_by(code, gender) %>% 
   nest() %>% 
   mutate(lmr_list = map(data, make_z_list, adjust = 0.5)) %>% 
@@ -97,3 +98,76 @@ joined_data %>%
   mutate(lmr = log(mr, 10)) %>% 
   plot_ly() %>% 
   add_heatmap(x = ~Age, y = ~Year, z = ~lmr)
+
+# from https://plot.ly/r/heatmaps/ 
+
+vals <- unique(scales::rescale(c(volcano)))
+o <- order(vals, decreasing = FALSE)
+cols <- scales::col_numeric("Blues", domain = NULL)(vals)
+colz <- setNames(data.frame(vals[o], cols[o]), NULL)
+p <- plot_ly(z = volcano, colorscale = colz, type = "heatmap")
+
+p
+
+plot_ly(z = volcano, colorscale = colz) %>% add_surface()
+
+lmr_data %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender == "Total") %>% 
+  .[["lmr_list"]] %>% 
+  pluck(1) %>% 
+  pluck("vals") -> vals 
+
+
+o <- order(vals, decreasing = FALSE)
+cols <- scales::col_numeric("Blues", domain = NULL)(vals)
+
+colz <- setNames(data.frame(vals[o], cols[o]), NULL)
+plot_ly(z = vals, colorscale = colz) %>% 
+  add_surface()
+
+cols <- rainbow(100)
+breakpoints <- scales::rescale(10^seq(0, 1, length = 100))
+
+plot_ly(z = 10^vals, surfacecolor = vals) %>% 
+  add_surface(
+#    surfaceaxis = 2
+    #colors = ~scales::rescale(vals)
+#    surfacecolor = rgb(0.5, 0.5, 0.5)
+    # colorscale = list(
+    #   # c(0, 1),
+    #   # c(rgb(0,0,0), rgb(1,1,1))
+    #   breakpoints,
+    #   cols 
+    # ),
+    # cauto = F,
+    # cmin = 0, cmax = 1
+    
+    ) %>% 
+  layout(
+    scene = list(
+      zaxis = list(
+        title = "Mort",
+        type = "log"
+      )
+    )
+  ) -> p
+
+plotly_json(p)
+
+
+#####
+x <- seq(-3, 3, by = 0.1)
+y <- 10^x
+
+plot_ly(x = ~x, y = ~y) %>% 
+  add_lines(
+  ) %>% 
+  layout(
+    yaxis = list(
+      type = "log",
+      range = c(1, 2)
+                 )
+  )
+  
+
