@@ -63,11 +63,6 @@ shinyUI(fluidPage(
           plotlyOutput("mort_surface")
           plotlyOutput("mort_subplot")
         }
-        ),
-        tabPanel("Population",
-        {
-          plotlyOutput("pop_surface")  
-        }
         )
                    
       )
