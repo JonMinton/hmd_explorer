@@ -6,6 +6,8 @@
 # 
 #    http://shiny.rstudio.com/
 #
+library(plotly)
+library(tidyverse)
 
 library(shiny)
 

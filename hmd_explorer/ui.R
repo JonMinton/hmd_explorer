@@ -7,7 +7,9 @@
 #    http://shiny.rstudio.com/
 #
 
-library(HMDHFDplus)
+library(plotly)
+library(tidyverse)
+
 library(shiny)
 
 codes <- HMDHFDplus::getHMDcountries()
