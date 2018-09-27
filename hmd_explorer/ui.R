@@ -36,8 +36,8 @@ shinyUI(fluidPage(
 
     # Show a plot of the generated distribution
     mainPanel(
-      plotlyOutput("mort_surface")
-      
+      plotlyOutput("mort_surface"),
+      plotlyOutput("mort_subplot")
     )
   )
 ))
