@@ -30,7 +30,28 @@ shinyUI(fluidPage(
        selectInput("gender_select",
                    "Select gender of interest",
                    choices = c("Male", "Female", "Total"),
-                   selected = "Total")
+                   selected = "Total"),
+       checkboxInput("limit_age",
+                     "Check to limit ages",
+                     value = F
+                     ),
+       conditionalPanel("input.limit_age == true",
+          sliderInput("age_limits",
+                      "Select age limit range",
+                      min = 0, max = 110, step = 1, 
+                      value = c(0, 110))              
+                        ),
+       checkboxInput("limit_period",
+                     "Check to limit year range",
+                     value = F
+       ),
+       conditionalPanel("input.limit_period == true",
+                        sliderInput("period_limits", sep = "",
+                                    "Select range of years",
+                                    min = 1750, max = 2020, step = 1, 
+                                    value = c(1750, 2020))              
+       )
+       
        
     ),
 
