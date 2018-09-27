@@ -12,8 +12,7 @@ library(tidyverse)
 
 library(shiny)
 
-codes <- HMDHFDplus::getHMDcountries()
-
+codes_named <- read_rds("data/codes_named.rds")
 # Define UI for application that draws a histogram
 shinyUI(fluidPage(
   
@@ -24,8 +23,8 @@ shinyUI(fluidPage(
   sidebarLayout(
     sidebarPanel(
        selectInput("code_select",
-                   "Select gender of interest",
-                   choices = codes,
+                   "Select country of interest",
+                   choices = codes_named,
                    selected = "GBR_SCO",
                    multiple = FALSE),
        selectInput("gender_select",
