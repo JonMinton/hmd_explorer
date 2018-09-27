@@ -188,4 +188,65 @@ shinyServer(function(input, output) {
     return(p)
   })
   
+  output$pop_surface <- renderPlotly({
+    
+    dta_ss <- full_data %>% 
+      filter(code == input$code_select) %>% 
+      filter(gender == input$gender_select) 
+    
+    
+    if(input$limit_age){
+      dta_ss <- dta_ss %>% 
+        filter(Age >= input$age_limits[1], Age <= input$age_limits[2])
+    }    
+    if (input$limit_period){
+      dta_ss <- dta_ss %>% 
+        filter(Year >= input$period_limits[1], Year <= input$period_limits[2])
+    }
+    
+    dta_ss <- dta_ss %>% 
+      group_by(code, gender) %>% 
+      nest()
+    
+    z_list <- dta_ss %>% 
+      mutate(pop_list = map(data, make_z_list_pop))
+    
+    
+    xx <- z_list[["pop_list"]][[1]][["age"]]
+    yy <- z_list[["pop_list"]][[1]][["year"]]
+    zz <- z_list[["pop_list"]][[1]][["vals"]]
+    
+    n_ages <- length(xx)
+    n_years <- length(yy)
+    
+    p <-   plot_ly(
+      x = ~xx,
+      y = ~yy,
+      z = ~zz,
+      surfacecolor = ~zz
+    ) %>% add_surface(
+      colorbar = list(
+        title = "Population"
+      )
+    ) %>% 
+      layout(
+        scene = list(
+          zaxis = list(
+            title = "Population"
+          ),
+          xaxis = list(
+            title = "Age in years"
+          ),
+          yaxis = list(
+            title = "Year"
+          ),
+          aspectratio = list(
+            x = n_ages / n_years, y = 1, z = 0.5
+          )
+        )
+      )
+    
+    return(p)
+  })
+  
 })
