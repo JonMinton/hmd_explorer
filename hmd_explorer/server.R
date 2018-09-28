@@ -11,15 +11,16 @@ library(tidyverse)
 
 library(shiny)
 
-full_data <- read_csv("data/hmd_data.csv")
+full_data <- read_csv("data/hmd_data.csv") 
+names(full_data) <- tolower(names(full_data))
 
 codes_named <- read_rds("data/codes_named.rds")
 
 ### FUNCTIONS 
 
-make_z_list_pop <- function(X){
+make_z_list_pop <- function(X, what = "num_population"){
   out_df <- X %>% 
-    select(year = Year, age = Age, val = num_population) 
+    select(year = year, age = age, val = !!what) 
   
   out_df %>% 
     select(year, age, val) %>% 
@@ -34,7 +35,7 @@ make_z_list_pop <- function(X){
 
 make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
   tmp <- X %>% 
-    select(year = Year, age = Age, n = num_deaths, N = exposure) 
+    select(year = year, age = age, n = num_deaths, N = exposure) 
   
   if(what == "lmr_k"){
     out_df <- tmp %>% 
@@ -61,7 +62,7 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
 
 
 # Define server logic required to draw a histogram
-shinyServer(function(input, output) {
+shinyServer(function(input, output){
    
   output$mort_surface <- renderPlotly({
 
@@ -72,11 +73,11 @@ shinyServer(function(input, output) {
 
     if(input$limit_age){
       dta_ss <- dta_ss %>% 
-        filter(Age >= input$age_limits[1], Age <= input$age_limits[2])
+        filter(age >= input$age_limits[1], age <= input$age_limits[2])
     }    
     if (input$limit_period){
       dta_ss <- dta_ss %>% 
-        filter(Year >= input$period_limits[1], Year <= input$period_limits[2])
+        filter(year >= input$period_limits[1], year <= input$period_limits[2])
     }
     
     dta_ss <- dta_ss %>% 
@@ -99,7 +100,8 @@ shinyServer(function(input, output) {
       x = ~xx,
       y = ~yy,
       z = ~zz,
-      surfacecolor = ~zc
+      surfacecolor = ~zc,
+      source = "mort_surface"
     ) %>% add_surface(
       colorbar = list(
         title = "Log Mortality rate"
@@ -113,10 +115,10 @@ shinyServer(function(input, output) {
             autorange = TRUE
           ),
           xaxis = list(
-            title = "Age in years"
+            title = "age in years"
           ),
           yaxis = list(
-            title = "Year"
+            title = "year"
           ),
           aspectratio = list(
             x = n_ages / n_years, y = 1, z = 0.5
@@ -128,189 +130,415 @@ shinyServer(function(input, output) {
     return(p)
   })
   # 
-  # output$mort_subplot <- renderPlotly({
-  #   
-  #   s <- event_data("plotly_hover")
-  #   if (length(s) == 0){ return(NULL)} else {
-  # 
-  #     this_age <- s$x
-  #     this_year <- s$y
-  #     this_cohort = this_year - this_age
-  # 
-  #     p1 <- full_data %>%
-  #       filter(Age <=100) %>%
-  #       filter(code == input$code_select) %>%
-  #       filter(gender == input$gender_select) %>%
-  #       filter(Age == this_age) %>%
-  #       mutate(mr = num_deaths / exposure) %>%
-  #       plot_ly(x = ~Year, y = ~mr) %>%
-  #       add_lines()
-  #      
-  #     p2 <- full_data %>%
-  #       filter(Age <=100) %>%
-  #       filter(code == input$code_select) %>%
-  #       filter(gender == input$gender_select) %>%
-  #       filter(Year == this_year) %>%
-  #       mutate(mr = (num_deaths +0.5)/ (exposure+0.5)) %>%
-  #       plot_ly(x = ~Age, y = ~mr) %>%
-  #       add_lines()
-  # 
-  #     p3 <- full_data %>%
-  #       filter(Age <=100) %>%
-  #       filter(code == input$code_select) %>%
-  #       filter(gender == input$gender_select) %>%
-  #       mutate(birth_cohort = Year - Age) %>%
-  #       filter(birth_cohort == this_cohort) %>%
-  #       mutate(mr = (num_deaths +0.5)/ (exposure+0.5)) %>%
-  #       plot_ly(x = ~Age, y = ~mr) %>%
-  #       add_lines()
-  #   #   
-  #      this_country_name <- names(codes_named[codes_named == input$code_select])
-  #   #   
-  #     p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
-  #       layout(
-  #         yaxis = list(
-  #           title = "Mortality rate",
-  #           range = c(-5, 0),
-  #           type = "log"
-  #         ),
-  #         xaxis = list(title = "Year"),
-  #         xaxis2 = list(title = "Age", range = c(0, 90)),
-  #         xaxis3 = list(title = paste0("Age for ", this_cohort, " birth cohort"),
-  #                       range = c(0, 90)),
-  #         title = paste0(
-  #           "Mortality schedules for ", input$gender_select, ", ", this_country_name,
-  #           " in year ", this_year,
-  #           " and age ", this_age
-  #         ),
-  #         showlegend = FALSE
-  #       )
-  #   }
-  #   return(p)
-  # })
-  # 
-  # output$pop_surface <- renderPlotly({
-  #   
-  #   dta_ss <- full_data %>% 
-  #     filter(code == input$code_select) %>% 
-  #     filter(gender == input$gender_select) 
-  #   
-  #   
-  #   if(input$limit_age){
-  #     dta_ss <- dta_ss %>% 
-  #       filter(Age >= input$age_limits[1], Age <= input$age_limits[2])
-  #   }    
-  #   if (input$limit_period){
-  #     dta_ss <- dta_ss %>% 
-  #       filter(Year >= input$period_limits[1], Year <= input$period_limits[2])
-  #   }
-  #   
-  #   dta_ss <- dta_ss %>% 
-  #     group_by(code, gender) %>% 
-  #     nest()
-  #   
-  #   z_list <- dta_ss %>% 
-  #     mutate(pop_list = map(data, make_z_list_pop))
-  #   
-  #   
-  #   xx <- z_list[["pop_list"]][[1]][["age"]]
-  #   yy <- z_list[["pop_list"]][[1]][["year"]]
-  #   zz <- z_list[["pop_list"]][[1]][["vals"]]
-  #   
-  #   n_ages <- length(xx)
-  #   n_years <- length(yy)
-  #   
-  #   p <-   plot_ly(
-  #     x = ~xx,
-  #     y = ~yy,
-  #     z = ~zz,
-  #     surfacecolor = ~zz
-  #   ) %>% add_surface(
-  #     colorbar = list(
-  #       title = "Population"
-  #     )
-  #   ) %>% 
-  #     layout(
-  #       scene = list(
-  #         zaxis = list(
-  #           title = "Population"
-  #         ),
-  #         xaxis = list(
-  #           title = "Age in years"
-  #         ),
-  #         yaxis = list(
-  #           title = "Year"
-  #         ),
-  #         aspectratio = list(
-  #           x = n_ages / n_years, y = 1, z = 0.5
-  #         )
-  #       )
-  #     )
-  #   
-  #   return(p)
-  # })
-  # 
-  # output$pop_subplot <- renderPlotly({
-  #   
-  #   s <- event_data("plotly_hover")
-  #   
-  #   if (length(s) == 0){ return(NULL)} else {
-  #   
-  #     this_age <- s$x
-  #     this_year <- s$y
-  #     this_cohort = this_year - this_age
-  #     
-  #     p1 <- full_data %>%
-  #       filter(Age <=100) %>%
-  #       filter(code == input$code_select) %>%
-  #       filter(gender == input$gender_select) %>%
-  #       filter(Age == this_age) %>%
-  #       mutate(mr = num_deaths / exposure) %>%
-  #       plot_ly(x = ~Year, y = ~mr) %>%
-  #       add_lines()
-  #     
-  #     p2 <- full_data %>%
-  #       filter(Age <=100) %>%
-  #       filter(code == input$code_select) %>%
-  #       filter(gender == input$gender_select) %>%
-  #       filter(Year == this_year) %>%
-  #       mutate(mr = (num_deaths +0.5)/ (exposure+0.5)) %>%
-  #       plot_ly(x = ~Age, y = ~mr) %>%
-  #       add_lines()
-  #     
-  #     p3 <- full_data %>%
-  #       filter(Age <=100) %>%
-  #       filter(code == input$code_select) %>%
-  #       filter(gender == input$gender_select) %>%
-  #       mutate(birth_cohort = Year - Age) %>%
-  #       filter(birth_cohort == this_cohort) %>%
-  #       mutate(mr = (num_deaths +0.5)/ (exposure+0.5)) %>%
-  #       plot_ly(x = ~Age, y = ~mr) %>%
-  #       add_lines()
-  #     #   
-  #     this_country_name <- names(codes_named[codes_named == input$code_select])
-  #     #   
-  #     p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
-  #       layout(
-  #         yaxis = list(
-  #           title = "Mortality rate",
-  #           range = c(-5, 0),
-  #           type = "log"
-  #         ),
-  #         xaxis = list(title = "Year"),
-  #         xaxis2 = list(title = "Age", range = c(0, 90)),
-  #         xaxis3 = list(title = paste0("Age for ", this_cohort, " birth cohort"),
-  #                       range = c(0, 90)),
-  #         title = paste0(
-  #           "Mortality schedules for ", input$gender_select, ", ", this_country_name,
-  #           " in year ", this_year,
-  #           " and age ", this_age
-  #         ),
-  #         showlegend = FALSE
-  #       )
-  #   }
-  #   return(p)
-  # })
+  output$mort_subplot <- renderPlotly({
+    s <- event_data("plotly_hover", source = "mort_surface")
+    if (length(s) == 0){ return(NULL)} else {
+
+      this_age <- s$x
+      this_year <- s$y
+      this_cohort = this_year - this_age
+
+      p1 <- full_data %>%
+        filter(age <=100) %>%
+        filter(code == input$code_select) %>%
+        filter(gender == input$gender_select) %>%
+        filter(age == this_age) %>%
+        mutate(mr = num_deaths / exposure) %>%
+        plot_ly(x = ~year, y = ~mr) %>%
+        add_lines()
+
+      p2 <- full_data %>%
+        filter(age <=100) %>%
+        filter(code == input$code_select) %>%
+        filter(gender == input$gender_select) %>%
+        filter(year == this_year) %>%
+        mutate(mr = (num_deaths +0.5)/ (exposure+0.5)) %>%
+        plot_ly(x = ~age, y = ~mr) %>%
+        add_lines()
+
+      p3 <- full_data %>%
+        filter(age <=100) %>%
+        filter(code == input$code_select) %>%
+        filter(gender == input$gender_select) %>%
+        mutate(birth_cohort = year - age) %>%
+        filter(birth_cohort == this_cohort) %>%
+        mutate(mr = (num_deaths +0.5)/ (exposure+0.5)) %>%
+        plot_ly(x = ~age, y = ~mr) %>%
+        add_lines()
+    #
+       this_country_name <- names(codes_named[codes_named == input$code_select])
+    #
+      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+        layout(
+          yaxis = list(
+            title = "Mortality rate",
+            range = c(-5, 0),
+            type = "log"
+          ),
+          xaxis = list(title = "year"),
+          xaxis2 = list(title = "age", range = c(0, 100)),
+          xaxis3 = list(title = paste0("age for ", this_cohort, " birth cohort"),
+                        range = c(0, 100)),
+          title = paste0(
+            "Mortality schedules for ", input$gender_select, ", ", this_country_name,
+            " in year ", this_year,
+            " and age ", this_age
+          ),
+          showlegend = FALSE
+        )
+    }
+     return(p)
+  })
   
+  output$pop_surface <- renderPlotly({
+
+    this_code <- input$code_select
+    this_gender <- input$gender_select
+    
+    if (this_gender == "Total"){
+      
+      dta_ss <- full_data %>% 
+        filter(code == this_code) %>% 
+        filter(gender != "Total") %>% 
+        group_by(code, age, year) %>% 
+        mutate(cumulative_pop = cumsum(num_population)) %>% 
+        ungroup()
+      
+    } else {
+      dta_ss <- full_data %>% 
+        filter(code == this_code) %>% 
+        filter(gender == this_gender) 
+    }
+
+
+    if(input$limit_age){
+      dta_ss <- dta_ss %>%
+        filter(age >= input$age_limits[1], age <= input$age_limits[2])
+    }
+
+    if (input$limit_period){
+      dta_ss <- dta_ss %>%
+        filter(year >= input$period_limits[1], year <= input$period_limits[2])
+    }
+
+    if (this_gender == "Total"){
+      
+      z_list <- dta_ss %>% 
+        group_by(code, gender) %>% 
+        nest() %>% 
+        mutate(pop_list = map(data, make_z_list_pop, what = "cumulative_pop"))
+      
+    } else {
+      z_list <- dta_ss %>% 
+        group_by(code, gender) %>% 
+        nest() %>% 
+        mutate(pop_list = map(data, make_z_list_pop, what = "num_population"))
+    }
+
+
+    if (this_gender == "Total"){
+
+      xx <- z_list[["pop_list"]][[1]][["age"]]
+      yy <- z_list[["pop_list"]][[1]][["year"]]
+      zzf <- z_list[["pop_list"]][[1]][["vals"]]
+      zzm <- z_list[["pop_list"]][[2]][["vals"]] 
+      
+      n_ages <- length(xx)
+      n_years <- length(yy)
+      
+      p <- plot_ly(
+        showscale = FALSE
+        
+      ) %>% 
+      add_surface(
+        x = ~xx,
+        y = ~yy,
+        z = ~zzf,
+        name = "Females",
+        opacity = 0.7,
+        colorscale = list(
+          c(0, 1),
+          c("red", "red")
+        )
+      ) %>%
+        add_surface(
+          x = ~xx,
+          y = ~yy, 
+          z = ~zzm,
+          name = "Males",
+          opacity = 0.7,
+          colorscale = list(
+            c(0, 1),
+            c("blue", "blue")
+          )
+          
+        ) %>% 
+        layout(
+          scene = list(
+            zaxis = list(
+              title = "Population"
+            ),
+            xaxis = list(
+              title = "age in years"
+            ),
+            yaxis = list(
+              title = "year"
+            ),
+            aspectratio = list(
+              x = n_ages / n_years, y = 1, z = 0.5
+            ),
+            showlegend = FALSE
+          )
+        )
+      
+      
+      
+    } else {
+      xx <- z_list[["pop_list"]][[1]][["age"]]
+      yy <- z_list[["pop_list"]][[1]][["year"]]
+      zz <- z_list[["pop_list"]][[1]][["vals"]]
+      
+      n_ages <- length(xx)
+      n_years <- length(yy)
+      
+      p <-   plot_ly(
+        x = ~xx,
+        y = ~yy,
+        z = ~zz,
+        surfacecolor = ~zz
+      ) %>% add_surface(
+        colorbar = list(
+          title = "Population"
+        )
+      ) %>%
+        layout(
+          scene = list(
+            zaxis = list(
+              title = "Population"
+            ),
+            xaxis = list(
+              title = "age in years"
+            ),
+            yaxis = list(
+              title = "year"
+            ),
+            aspectratio = list(
+              x = n_ages / n_years, y = 1, z = 0.5
+            )
+          )
+        )
+      
+    }
+
+    return(p)
+  })
+
+  output$pop_subplot <- renderPlotly({
+
+    s <- event_data("plotly_hover")
+    
+    if (length(s) == 0){ return(NULL)} else {
+
+
+      
+      this_code <- input$code_select
+      this_gender <- input$gender_select
+      this_age <- s$x
+      this_year <- s$y
+      this_cohort = this_year - this_age
+      
+      if (this_gender == "Total") {
+        
+
+        data_ss <- full_data %>% 
+          filter(age <= 100) %>% 
+          filter(code == this_code) %>% 
+          filter(gender != "Total") %>% 
+          group_by(year, age) %>% 
+          mutate(cumulative_pop = cumsum(num_population)) %>% 
+          mutate(prev = lag(cumulative_pop, default = 0)) %>% 
+          ungroup()
+        
+        max_pop <- data_ss %>% 
+          pull(cumulative_pop) %>% max(na.rm = T)
+        
+        p1 <- data_ss %>% 
+          filter(age == this_age) %>% 
+          plot_ly(x = ~ year) %>% 
+          add_ribbons(
+            ymin = ~prev, ymax = ~cumulative_pop,
+            color = ~gender,
+            showlegend = TRUE
+          )  
+        
+
+        p2 <- data_ss %>% 
+          filter(year == this_year) %>%
+          plot_ly(x = ~age) %>%
+          add_ribbons(
+            ymin = ~prev, ymax = ~cumulative_pop,
+            color = ~gender,
+            showlegend = FALSE
+          )
+
+        p3 <- data_ss %>% 
+          mutate(birth_cohort = year - age) %>%
+          filter(birth_cohort == this_cohort) %>%
+          plot_ly(x = ~age) %>%
+          add_ribbons(
+            ymin = ~prev, ymax = ~cumulative_pop,
+            color = ~gender,
+            showlegend = FALSE
+          )
+        
+      } else {
+        data_ss <- full_data %>% 
+          filter(age <= 100) %>% 
+          filter(code == this_code) %>% 
+          filter(gender == this_gender) 
+        
+        max_pop <- data_ss %>% 
+          pull(num_population) %>% max(na.rm = T)
+        
+        p1 <- data_ss %>% 
+          filter(code == this_code) %>% 
+          filter(gender == this_gender) %>% 
+          filter(age == this_age) %>% 
+          plot_ly(x = ~year, y = ~num_population) %>% 
+          add_lines(showlegend = FALSE)
+        
+        p2 <- data_ss %>% 
+          filter(year == this_year) %>%
+          plot_ly(x = ~age, y = ~num_population) %>%
+          add_lines(showlegend = FALSE)
+        
+        p3 <- data_ss %>% 
+          mutate(birth_cohort = year - age) %>%
+          filter(birth_cohort == this_cohort) %>%
+          plot_ly(x = ~age) %>%
+          add_lines(y = ~num_population, showlegend = FALSE)
+        
+      }
+      
+      
+
+
+      this_country_name <- names(codes_named[codes_named == input$code_select])
+      #
+      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+        layout(
+          yaxis = list(
+            title = "Population size",
+            range = c(0, max_pop)
+          ),
+          xaxis = list(title = "year"),
+          xaxis2 = list(title = "age", range = c(0, 100)),
+          xaxis3 = list(title = paste0("age for ", this_cohort, " birth cohort"),
+                        range = c(0, 100)),
+          title = paste0(
+            "Population counts for ", input$gender_select, ", ", this_country_name,
+            " in year ", this_year,
+            " and age ", this_age
+          )
+        )
+    }
+    return(p)
+  })
+  
+  
+  output$ratio_surface <- renderPlotly({
+    
+    ratio_limit <- as.double(input$ratio_limiter)
+    this_code <- input$code_select
+    this_gender <- input$gender_select
+    n_correction <- input$small_n_correction
+    
+
+      dta_ss <- full_data %>% 
+        filter(code == this_code) %>% 
+        filter(gender != "Total") 
+      
+    
+    if(input$limit_age){
+      dta_ss <- dta_ss %>%
+        filter(age >= input$age_limits[1], age <= input$age_limits[2])
+    }
+    
+    if (input$limit_period){
+      dta_ss <- dta_ss %>%
+        filter(year >= input$period_limits[1], year <= input$period_limits[2])
+    }
+      
+      z_list <- dta_ss %>% 
+        mutate(mr = (num_deaths+ n_correction) / (exposure + n_correction)) %>% 
+        select(age, year, gender, mr) %>% 
+        spread(gender, mr) %>% 
+        mutate(
+          ratio = Male / Female,
+          excess = (Male - Female) / Female,
+          ratio = case_when(
+            ratio < -ratio_limit ~ -ratio_limit,
+            ratio > ratio_limit  ~ ratio_limit, 
+            TRUE ~ ratio
+          )
+        ) %>% 
+        nest() %>% 
+        mutate(
+          ratio_list = map(data, make_z_list_pop, what = "ratio"),
+          excess_list = map(data, make_z_list_pop, what = "excess")
+               )
+    
+    
+      xx <- z_list[["ratio_list"]][[1]][["age"]]
+      yy <- z_list[["ratio_list"]][[1]][["year"]]
+      zz <- z_list[["ratio_list"]][[1]][["vals"]]
+
+      n_ages <- length(xx)
+      n_years <- length(yy)
+      
+      p <- plot_ly(
+        showscale = FALSE
+      ) %>% 
+        add_surface(
+          name = "Male:Female Mortality",
+          x = ~xx,
+          y = ~yy,
+          z = ~zz,
+          surfacecolor = ~log(zz),
+          colorscale = list(
+            seq(from = -ratio_limit, to = ratio_limit, length.out = 10),
+            colorRampPalette(RColorBrewer::brewer.pal(5, "RdBu"))(10)
+          ),
+          cmin = -ratio_limit, cmax = ratio_limit,
+          cauto = F
+        ) %>%
+        add_surface(
+          name = "equal ratio",
+          x = ~c(min(xx), max(xx)),
+          y = ~c(min(yy), max(yy)),
+          z = ~matrix(rep(1, 4), nrow = 2),
+          opacity = 0.5
+        ) %>% 
+        layout(
+          scene = list(
+            zaxis = list(
+              title = "Ratio",
+              type = "log"
+            ),
+            xaxis = list(
+              title = "age in years"
+            ),
+            yaxis = list(
+              title = "year"
+            ),
+            aspectratio = list(
+              x = n_ages / n_years, y = 1, z = 0.5
+            ),
+            showlegend = FALSE
+          )
+        )
+      
+    return(p)
+  })
   
 })
