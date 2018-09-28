@@ -53,14 +53,14 @@ shinyUI(fluidPage(
                       min = 1750, max = 2020, step = 1, 
                       value = c(1750, 2020))              
        ),
-       conditionalPanel("input.tabset_1 == 'Mortality Sex Ratios'",
+       conditionalPanel("input.tabset_1 == 'Mortality Sex Ratios' || input.tabset_1 == 'Population Sex Ratios'",
           sliderInput("ratio_limiter", 
                       "Select ratio limiter",
                       min = 1, max = 10, step = 0.5,
                       value = 3
                       )              
       ),
-      conditionalPanel("input.tabset_1 == 'Mortality Sex Ratios'",
+      conditionalPanel("input.tabset_1 == 'Mortality Sex Ratios' || input.tabset_1 == 'Population Sex Ratios'",
          numericInput("small_n_correction", 
           "Add small value to cells",
             min = 0, value = 50, max = 10000
@@ -82,10 +82,12 @@ shinyUI(fluidPage(
           plotlyOutput("pop_subplot")
         ),
        tabPanel(title = "Mortality Sex Ratios",
-          plotlyOutput("ratio_surface")
-        )
-                   
+          plotlyOutput("mort_ratio_surface")
+        ),
+       tabPanel(title = "Population Sex Ratios",
+          plotlyOutput("pop_ratio_surface")
       )
     )
     )
 ))
+)
