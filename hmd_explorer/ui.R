@@ -22,12 +22,28 @@ shinyUI(fluidPage(
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-       selectInput("code_select",
-                   "Select country of interest",
-                   choices = codes_named,
-                   selected = "GBR_SCO",
-                   multiple = FALSE),
-       conditionalPanel("input.tabset_1=='Mortality' || input.tabset_1=='Population'",
+      conditionalPanel("input.tabset_1 !='Mortality Group Comparisons'",
+         selectInput("code_select",
+                     "Select country of interest",
+                     choices = codes_named,
+                     selected = "GBR_SCO",
+                     multiple = FALSE)
+      ),
+      conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
+         selectInput("multi_code_select_B",
+                     "Select populations of interest",
+                     choices = codes_named,
+                     selected = "GBR_SCO",
+                     multiple = TRUE)                 
+      ),
+      conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
+         selectInput("multi_code_select_A",
+                     "Select comparator populations of interest",
+                     choices = codes_named,
+                     selected = "GBRTENW",
+                     multiple = TRUE)                 
+      ),
+       conditionalPanel("input.tabset_1=='Mortality' || input.tabset_1=='Population' || input.tabset_1=='Mortality Group Comparisons'",
           selectInput("gender_select",
                       "Select gender of interest",
                       choices = c("Male", "Female", "Total"),
@@ -86,6 +102,10 @@ shinyUI(fluidPage(
         ),
        tabPanel(title = "Population Sex Ratios",
           plotlyOutput("pop_ratio_surface")
+      ),
+      tabPanel(
+        title = "Mortality Group Comparisons",
+        plotlyOutput("mort_group_surface")
       )
     )
     )

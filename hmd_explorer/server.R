@@ -34,6 +34,8 @@ make_z_list_pop <- function(X, what = "num_population"){
 }
 
 make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
+  # adjust: amount to add to numerator and denominator 
+  # k: base to use if logging
   tmp <- X %>% 
     select(year = year, age = age, n = num_deaths, N = exposure) 
   
@@ -45,7 +47,7 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
       mutate(val = ifelse(is.nan(val), NA, val))
   } else if (what == "mr") {
     out_df <- tmp %>% 
-      mutate(val = (n + adjust) / (N+adjust))
+      mutate(val = (n + adjust) / (N + adjust) )
   }
   
   out_df %>% 
@@ -61,7 +63,6 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
 
 
 
-# Define server logic required to draw a histogram
 shinyServer(function(input, output){
    
   output$mort_surface <- renderPlotly({
@@ -96,6 +97,7 @@ shinyServer(function(input, output){
     n_years <- length(yy)
     
     zc <- z_list[["lmr_list"]][[1]][["vals"]]
+    
     p <-   plot_ly(
       x = ~xx,
       y = ~yy,
@@ -240,15 +242,15 @@ shinyServer(function(input, output){
 
       xx <- z_list[["pop_list"]][[1]][["age"]]
       yy <- z_list[["pop_list"]][[1]][["year"]]
-      zzf <- z_list[["pop_list"]][[1]][["vals"]]
-      zzm <- z_list[["pop_list"]][[2]][["vals"]] 
+      zzf <- z_list[["pop_list"]][[1]][["vals"]] # females
+      zzm <- z_list[["pop_list"]][[2]][["vals"]] # males
       
       n_ages <- length(xx)
       n_years <- length(yy)
       
       p <- plot_ly(
-        showscale = FALSE
-        
+        showscale = FALSE,
+        source = "pop_surface"
       ) %>% 
       add_surface(
         x = ~xx,
@@ -305,7 +307,8 @@ shinyServer(function(input, output){
         x = ~xx,
         y = ~yy,
         z = ~zz,
-        surfacecolor = ~zz
+        surfacecolor = ~zz,
+        source = "pop_surface"
       ) %>% add_surface(
         colorbar = list(
           title = "Population"
@@ -335,7 +338,7 @@ shinyServer(function(input, output){
 
   output$pop_subplot <- renderPlotly({
 
-    s <- event_data("plotly_hover")
+    s <- event_data("plotly_hover", source = "pop_surface")
     
     if (length(s) == 0){ return(NULL)} else {
 
@@ -467,14 +470,15 @@ shinyServer(function(input, output){
       dta_ss <- dta_ss %>%
         filter(year >= input$period_limits[1], year <= input$period_limits[2])
     }
-      
       z_list <- dta_ss %>% 
-        mutate(mr = (num_deaths+ n_correction) / (exposure + n_correction)) %>% 
+        mutate(mr = (num_deaths + n_correction) / (exposure + n_correction)) %>% 
         select(age, year, gender, mr) %>% 
         spread(gender, mr) %>% 
         mutate(
           ratio = Male / Female,
-          excess = (Male - Female) / Female,
+          excess = (Male - Female) / Female
+        ) %>% 
+        mutate(
           ratio = case_when(
             ratio < -ratio_limit ~ -ratio_limit,
             ratio > ratio_limit  ~ ratio_limit, 
@@ -504,7 +508,7 @@ shinyServer(function(input, output){
                paste0(round(1/zz, 2), " female deaths/male death")
         ), "\n(",
         ifelse(zz_e > 0, 
-               paste0(round(zz_e * 1000, 0), " excess male deaths/1000 females"),
+               paste0( round(zz_e * 1000, 0), " excess male deaths/1000 females"),
                paste0(-round(zz_e * 1000, 0), " excess female deaths/1000 males")
         ), ")"
       ) %>% 
@@ -666,4 +670,30 @@ shinyServer(function(input, output){
     
     return(p)
   })
+  
+  output$mort_group_surface <- renderPlot({
+
+    tmp <- full_data %>% 
+      filter(gender == input$gender_select) %>% 
+      mutate(
+        pop_group = case_when(
+          code %in% input$multi_code_select_B ~ "B", 
+          code %in% input$multi_code_select_A ~ "A", 
+          TRUE ~ NA_character_
+        )
+      ) %>% 
+      filter(!is.na(pop_group)) %>% 
+      group_by(pop_group, year, age) %>% 
+      summarise(
+        exposure = sum(exposure, na.rm = T),
+        num_deaths = sum(num_deaths, na.rm = T)
+      ) %>% 
+      ungroup() %>%
+      mutate(lmr = log((num_deaths + 0.5)/(exposure + 0.5),10)) 
+      
+    browser()  
+    return(NULL)
+  })
+  
+  
 })
