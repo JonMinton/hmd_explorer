@@ -3,7 +3,6 @@ library(plotly)
 library(HMDHFDplus)
 
 getHMDcountries()
-getHMDcountries()
 
 username <- "jon.will.minton@gmail.com"
 password <- "passphrase"
