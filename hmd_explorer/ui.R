@@ -22,7 +22,7 @@ shinyUI(fluidPage(
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-      conditionalPanel("input.tabset_1 !='Mortality Group Comparisons'",
+      conditionalPanel("input.tabset_1 !='Mortality Group Comparisons' & input.tabset_1 != 'Tadpole Charts'",
          selectInput("code_select",
                      "Select country of interest",
                      choices = codes_named,
@@ -35,6 +35,20 @@ shinyUI(fluidPage(
                      choices = codes_named,
                      selected = "GBR_SCO",
                      multiple = TRUE)                 
+      ),
+      conditionalPanel("input.tabset_1 == 'Tadpole Charts'",
+        selectInput("tadpole_highlight",
+                    "Select population to focus on",
+                    choices = codes_named,
+                    selected = "GBR_SCO"
+                    )                       
+      ),
+      conditionalPanel("input.tabset_1 == 'Tadpole Charts'",
+        selectInput("tadpole_group",
+                    "Select populations to include",
+                    choices = codes_named, multiple = TRUE, 
+                    selected = c("GBRTENW", "GBR_SCO", "GBR_NIR")
+                    )                      
       ),
       conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
          selectInput("multi_code_select_A",
@@ -49,20 +63,22 @@ shinyUI(fluidPage(
                       choices = c("Male", "Female", "Total"),
                       selected = "Total")
        ),
-       checkboxInput("limit_age",
-                     "Check to limit ages",
-                     value = F
-                     ),
-       conditionalPanel("input.limit_age == true",
+      conditionalPanel("input.tabset_1 != 'Tadpole Charts'",
+                       checkboxInput("limit_age",
+                          "Check to limit ages",
+                          value = F
+                       )
+      ),
+      conditionalPanel("input.limit_age == true",
           sliderInput("age_limits",
                       "Select age limit range",
                       min = 0, max = 110, step = 1, 
                       value = c(0, 110))              
                         ),
-       checkboxInput("limit_period",
-                     "Check to limit year range",
-                     value = F
-       ),
+      checkboxInput("limit_period",
+                    "Check to limit year range",
+                    value = F
+      ),
       conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
         checkboxInput("limit_diffz",
                       "Check to set range for differences shown",
@@ -121,6 +137,11 @@ shinyUI(fluidPage(
         title = "Mortality Group Comparisons",
         plotlyOutput("mort_group_surface"),
         plotlyOutput("mort_group_subplot")
+      ),
+      tabPanel(
+        title = "Tadpole Charts",
+        plotlyOutput("tadpole_plot")
+        
       )
     )
     )
