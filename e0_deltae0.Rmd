@@ -1,0 +1,159 @@
+---
+title: "Mort against Mort Change Comparer"
+output: html_notebook
+---
+# Aim
+
+The aim of this is to compare mortality against change in mortality for a number of countries.
+
+## Load the packages
+```{r}
+pacman::p_load(
+  tidyverse, 
+  plotly,
+  HMDHFDplus
+)
+```
+
+Now, how do I grab life expectancies only for each country? 
+
+```{r}
+# username <- "jon.will.minton@gmail.com"
+# password <- "passphrase"
+# 
+# hmd_dta <- data_frame(
+#   code = getHMDcountries()
+# ) %>% 
+#   mutate(deaths = map(code, readHMDweb, item = "e0per", username = username, password = password))
+
+
+```
+
+API approach seems to be blocked in Meridian Court (Firewall?) so have manually downloaded
+
+
+```{r}
+baseloc <- "N:/Jon/hmd_data/hmd_countries/"
+
+codes <- dir(baseloc)
+
+hmd_e0 <- data_frame(
+  code = codes
+) %>% 
+  mutate(
+    e0 = map(
+      code,
+      function(x) {
+        read_table(
+          file.path(
+            baseloc, x, "STATS/e0per.txt"
+          ),
+          skip = 2,
+          col_types = "iddd"
+          
+        )
+      }
+    )
+  ) %>% 
+  unnest() %>% 
+  gather(key = "gender", value = "e0", Female:Total)
+
+
+# Code to make this data available for app
+# names(hmd_e0) <- tolower(names(hmd_e0))
+# 
+# hmd_e0 <- hmd_e0 %>% 
+#   mutate(gender = tolower(gender))
+# 
+# write_csv(x = hmd_e0, path = "hmd_explorer/data/hmd_e0.csv")
+
+```
+
+Now to visualise
+
+```{r}
+hmd_e0 %>% 
+  group_by(code, gender) %>% 
+  arrange(Year) %>% 
+  mutate(delta_e0 = e0 - lag(e0)) %>% 
+  filter(!is.na(delta_e0)) %>% 
+  filter(gender != "Total") %>% 
+  filter(Year >= 1990) -> tmp
+
+tmp %>% 
+  ggplot(aes(y = delta_e0, x = e0, group = code)) + 
+  geom_path(alpha = 0.3) +
+  facet_wrap(~gender) +
+  geom_path(
+    aes(y = delta_e0, x = e0, colour = code, alpha = newness),
+    size = 1.2,
+    data = tmp %>% 
+      filter(code %in% c("GBR_SCO", "USA", "GBRTENW")) %>% 
+      mutate(newness = Year - 1990),
+    inherit.aes = FALSE
+  ) 
+```
+
+```{r}
+hmd_e0 %>% 
+  group_by(code, gender) %>% 
+  arrange(Year) %>% 
+  mutate(delta_e0 = e0 - lag(e0)) %>% 
+  filter(!is.na(delta_e0)) %>% 
+  filter(gender != "Total") %>% 
+  filter(Year >= 1970) -> tmp
+
+tmp %>% 
+  ggplot(aes(y = delta_e0, x = e0, group = code)) + 
+  geom_path(alpha = 0.3) +
+  facet_wrap(~gender) +
+  geom_path(
+    aes(y = delta_e0, x = e0, colour = code, alpha = newness),
+    size = 1.2,
+    data = tmp %>% 
+      filter(code %in% c("GBR_SCO", "USA", "GBRTENW", "NLD", "FRANTP", "SWE", "AUT", "CHE", "POL", "DNK", "CZE", "JPN", "BLR")) %>% 
+      mutate(newness = Year - 1970),
+    inherit.aes = FALSE
+  ) 
+```
+
+
+```{r}
+tmp %>% 
+  filter(code %in% c("GBR_SCO", "USA", "GBRTENW", "NLD", "FRANTP", "SWE", "AUT", "CHE", "POL", "DNK", "CZE", "JPN", "BLR")) %>% 
+  group_by(code) %>% 
+  mutate(val_2016 = e0[Year == 2016 & gender == "Female"]) %>% 
+  ungroup() %>% 
+  mutate(newness = Year - 1970) %>% 
+  mutate(code = fct_reorder(code, val_2016)) %>% 
+  ggplot(aes(y = delta_e0, x = e0, alpha = newness, colour = gender)) + 
+  geom_path() +
+  facet_grid(code~.) +
+  geom_hline(yintercept = 0) +
+  coord_equal() +
+  geom_point(
+    aes(y = delta_e0, x = e0, colour = gender),
+    inherit.aes = F,
+    data = 
+      tmp %>% 
+      filter(code %in% c("GBR_SCO", "USA", "GBRTENW", "NLD", "FRANTP", "SWE", "AUT", "CHE", "POL", "DNK", "CZE", "JPN", "BLR")) %>% 
+      group_by(code) %>% 
+      mutate(val_2016 = e0[Year == 2016 & gender == "Female"]) %>% 
+      ungroup() %>% 
+      mutate(code = fct_reorder(code, val_2016)) %>% 
+      filter(Year == 2016)
+  ) +
+  labs(x = "Life expectancy at birth in years", y = "Change in life expectancy from previous year",
+       title = "Paths to progress: 1970 to 2016",
+       subtitle = "Life expectancy against change in life expectancy for selected countries (Dot indicates 2016)",
+       caption = "Newer years are bolder and older years are fainter\nSource: HMD") + 
+  guides(alpha = FALSE) +
+  theme(
+    plot.caption = element_text(hjust = 1)
+    )
+
+ggsave("sc.png", height = 30, width = 20, units = "cm", dpi = 300)
+
+```
+
+

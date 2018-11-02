@@ -16,6 +16,15 @@ names(full_data) <- tolower(names(full_data))
 
 codes_named <- read_rds("data/codes_named.rds")
 
+hmd_e0 <- read_csv("data/hmd_e0.csv") 
+
+names(hmd_e0) <- tolower(names(hmd_e0))
+
+hmd_e0 <- hmd_e0 %>% 
+  mutate(gender = tolower(gender))
+
+
+
 ### FUNCTIONS 
 
 make_z_list_pop <- function(X, what = "num_population"){
@@ -33,8 +42,15 @@ make_z_list_pop <- function(X, what = "num_population"){
   out <- list(age = ages, year = years, vals = val_mtrx)
 }
 
+<<<<<<< HEAD
 make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10, diff = 0, smooth = T){
   
+=======
+
+make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
+  # adjust: amount to add to numerator and denominator 
+  # k: base to use if logging
+>>>>>>> 4e61ea211aa2e6388f513c498c30a11b20fed9e2
   tmp <- X %>% 
     select(year = year, age = age, n = num_deaths, N = exposure) 
   
@@ -46,7 +62,7 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10, diff = 0, smooth 
       mutate(val = ifelse(is.nan(val), NA, val))
   } else if (what == "mr") {
     out_df <- tmp %>% 
-      mutate(val = (n + adjust) / (N+adjust))
+      mutate(val = (n + adjust) / (N + adjust) )
   }
   
 
@@ -89,8 +105,8 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10, diff = 0, smooth 
 
 
 
-# Define server logic required to draw a histogram
 shinyServer(function(input, output){
+<<<<<<< HEAD
   
   recalc_mort_surface <- eventReactive(input$redraw_mort_surface,
                 {
@@ -113,6 +129,49 @@ shinyServer(function(input, output){
   
   recalc_pop_surface <- eventReactive(input$redraw_pop_surface,
       {
+=======
+
+  newdata <- eventReactive(input$recalc,
+    {
+       tmp <- full_data %>% 
+         filter(gender == input$gender_select) %>% 
+         mutate(
+           pop_group = case_when(
+             code %in% input$multi_code_select_B ~ "B", 
+             code %in% input$multi_code_select_A ~ "A", 
+             TRUE ~ NA_character_
+           )
+         ) %>% 
+         filter(!is.na(pop_group)) 
+       
+       if(input$limit_age){
+         tmp <- tmp %>%
+           filter(age >= input$age_limits[1], age <= input$age_limits[2])
+       }
+       
+       if (input$limit_period){
+         tmp <- tmp %>%
+           filter(year >= input$period_limits[1], year <= input$period_limits[2])
+       }
+       
+       tmp <- tmp %>% 
+         group_by(pop_group, year, age) %>% 
+         summarise(
+           exposure = sum(exposure, na.rm = T),
+           num_deaths = sum(num_deaths, na.rm = T)
+         ) %>% 
+         ungroup() %>%
+         mutate(lmr = log((num_deaths + input$small_n_correction)/(exposure + input$small_n_correction),10)) 
+       
+       return(tmp)
+     })  
+ 
+  output$mort_surface <- renderPlotly({
+
+    dta_ss <- full_data %>% 
+      filter(code == input$code_select) %>% 
+      filter(gender == input$gender_select) 
+>>>>>>> 4e61ea211aa2e6388f513c498c30a11b20fed9e2
 
         this_code <- input$code_select
         this_gender <- input$gender_select
@@ -167,6 +226,7 @@ shinyServer(function(input, output){
     n_years <- length(yy)
     
     zc <- z_list[["lmr_list"]][[1]][["vals"]]
+    
     p <-   plot_ly(
       x = ~xx,
       y = ~yy,
@@ -357,8 +417,8 @@ shinyServer(function(input, output){
 
       xx <- z_list[["pop_list"]][[1]][["age"]]
       yy <- z_list[["pop_list"]][[1]][["year"]]
-      zzf <- z_list[["pop_list"]][[1]][["vals"]]
-      zzm <- z_list[["pop_list"]][[2]][["vals"]] 
+      zzf <- z_list[["pop_list"]][[1]][["vals"]] # females
+      zzm <- z_list[["pop_list"]][[2]][["vals"]] # males
       
       n_ages <- length(xx)
       n_years <- length(yy)
@@ -366,7 +426,10 @@ shinyServer(function(input, output){
       p <- plot_ly(
         showscale = FALSE,
         source = "pop_surface"
+<<<<<<< HEAD
         
+=======
+>>>>>>> 4e61ea211aa2e6388f513c498c30a11b20fed9e2
       ) %>% 
       add_surface(
         x = ~xx,
@@ -454,6 +517,7 @@ shinyServer(function(input, output){
 
   output$pop_subplot <- renderPlotly({
 
+<<<<<<< HEAD
     s1 <- event_data("plotly_hover", source = "mort_surface")
     
     # set precedence so if the surface is clicked this overrides 
@@ -464,6 +528,9 @@ shinyServer(function(input, output){
     if (length(s2) != 0){
       s <- s2
     } else {s <- s1}
+=======
+    s <- event_data("plotly_hover", source = "pop_surface")
+>>>>>>> 4e61ea211aa2e6388f513c498c30a11b20fed9e2
     
     if (length(s) == 0){ return(NULL)} else {
 
@@ -595,14 +662,15 @@ shinyServer(function(input, output){
       dta_ss <- dta_ss %>%
         filter(year >= input$period_limits[1], year <= input$period_limits[2])
     }
-      
       z_list <- dta_ss %>% 
-        mutate(mr = (num_deaths+ n_correction) / (exposure + n_correction)) %>% 
+        mutate(mr = (num_deaths + n_correction) / (exposure + n_correction)) %>% 
         select(age, year, gender, mr) %>% 
         spread(gender, mr) %>% 
         mutate(
           ratio = Male / Female,
-          excess = (Male - Female) / Female,
+          excess = (Male - Female) / Female
+        ) %>% 
+        mutate(
           ratio = case_when(
             ratio < -ratio_limit ~ -ratio_limit,
             ratio > ratio_limit  ~ ratio_limit, 
@@ -632,7 +700,7 @@ shinyServer(function(input, output){
                paste0(round(1/zz, 2), " female deaths/male death")
         ), "\n(",
         ifelse(zz_e > 0, 
-               paste0(round(zz_e * 1000, 0), " excess male deaths/1000 females"),
+               paste0( round(zz_e * 1000, 0), " excess male deaths/1000 females"),
                paste0(-round(zz_e * 1000, 0), " excess female deaths/1000 males")
         ), ")"
       ) %>% 
@@ -794,4 +862,224 @@ shinyServer(function(input, output){
     
     return(p)
   })
+  
+  output$mort_group_surface <- renderPlotly({
+  
+
+    
+    diffs <- newdata() %>% 
+      select(pop_group, year, age, lmr) %>% 
+      spread(pop_group, lmr) %>% 
+      mutate(diff_lmr = B - A)
+    
+    z_list <- make_z_list_pop(diffs, what = "diff_lmr")
+    
+    range_limits <- eventReactive(input$recalc,
+      {
+        if (input$limit_diffz){
+          range_limits <- as.double(input$diffz_limits)
+        } else {
+          maxabs <- max(abs(zz[is.finite(zz)]))
+          range_limits <- c(-maxabs, maxabs)
+        }
+        return(range_limits)
+      })
+
+
+    
+    xx <- z_list[["age"]]
+    yy <- z_list[["year"]]
+    zz <- z_list[["vals"]]
+
+    n_ages <- length(xx)
+    n_years <- length(yy)
+    
+    range_limits <- range_limits()
+    maxabs <- max(abs(range_limits))
+    
+    yearvec <- rep(yy, times = length(xx))
+    agevec <- rep(xx, each = length(yy))
+    cohortvec <- yearvec - agevec
+    
+    rr <- 10^zz # mortality ratio
+    
+    custom_text <- paste0(
+      "In ", yearvec, ", at age ", 
+      agevec, " (", cohortvec, " birth cohort)\n",
+      "Diff in log mortality: ",
+        paste0(round(zz, 2)),
+      "\nRatio: ", paste0(round(rr, 2)), " (", paste0(round(1/rr, 2)), ")"
+    ) %>% 
+      matrix(length(yy), length(xx))
+    
+    
+    p <- plot_ly(
+      showscale = FALSE,
+      source = "mort_group_surface"
+    ) %>% 
+      add_surface(
+        name = "Diff in LMR",
+        x = ~xx,
+        y = ~yy,
+        z = ~zz,
+        surfacecolor = ~zz,
+        colorscale = list(
+          seq(from = -maxabs, to = maxabs, length.out = 10),
+          colorRampPalette(RColorBrewer::brewer.pal(5, "RdBu"))(10)
+        ),
+        hoverinfo = "text", text = custom_text,
+        cmin = range_limits[1], cmax = range_limits[2],
+        cauto = F
+      ) %>%
+      add_surface(
+        name = "equal ratio",
+        x = ~c(min(xx), max(xx)),
+        y = ~c(min(yy), max(yy)),
+        z = ~matrix(rep(0, 4), nrow = 2),
+        opacity = 0.5
+      ) %>% 
+      layout(
+        scene = list(
+          zaxis = list(
+            title = "Diff in log mortality"
+          ),
+          xaxis = list(
+            title = "age in years"
+          ),
+          yaxis = list(
+            title = "year"
+          ),
+          aspectratio = list(
+            x = n_ages / n_years, y = 1, z = 0.5
+          ),
+          showlegend = FALSE
+        )
+      )
+    
+
+    
+    
+    return(p)
+  })
+  
+  
+  output$mort_group_subplot <- renderPlotly({
+    # cat(file=stderr(), "the value of recalc is ", input$recalc,"\n")   
+    # s <- event_data("plotly_click", source = "mort_group_surface")
+    # cat(file=stderr(), "s ", ifelse(is.null(s), "is", "is not"), "NULL\n")   
+
+    if(is.null(s)) {return(NULL)} else {
+      diffs <- newdata() %>% 
+        select(pop_group, year, age, lmr) %>% 
+        spread(pop_group, lmr) %>% 
+        mutate(diff_lmr = B - A)
+      
+      this_age <- s$x[1]
+      this_year <- s$y[1]
+      this_cohort <- this_year - this_age
+            
+      absmax <- max(abs(diffs$diff_lmr), na.rm = T)
+      
+      p1 <- diffs %>% 
+        filter(age == this_age) %>% 
+        plot_ly(x = ~year, y = ~diff_lmr
+        ) %>% 
+        add_lines(showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~paste0(
+            "Year: ", year,
+            '\nLog mortalities: ', round(B, 3), ' - ', round(A, 3), ' = ', round(diff_lmr, 3),
+            '\nDeaths per 10,000: ', round(10000 * 10^B, 0), ' - ', round(10000 * 10^A, 0), 
+            "\nso ", 
+            ifelse(
+              B > A,
+              paste0( round(10000 * (10^B - 10^A),0), " more deaths"),
+              paste0( round(10000 * (10^A - 10^B),0), " fewer deaths")
+            )
+          )          
+        )
+      
+      p2 <- diffs %>% 
+        filter(year == this_year) %>%
+        plot_ly(x = ~age, y = ~diff_lmr) %>%
+        add_lines(showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~paste0(
+            "Age: ", age,
+            '\nLog mortalities: ', round(B, 3), ' - ', round(A, 3), ' = ', round(diff_lmr, 3),
+            '\nDeaths per 10,000: ', round(10000 * 10^B, 0), ' - ', round(10000 * 10^A, 0), 
+            "\nso ", 
+            ifelse(
+              B > A,
+              paste0( round(10000 * (10^B - 10^A),0), " more deaths"),
+              paste0( round(10000 * (10^A - 10^B),0), " fewer deaths")
+            )
+          )                
+        )
+      
+      p3 <- diffs %>% 
+        mutate(birth_cohort = year - age) %>%
+        filter(birth_cohort == this_cohort) %>%
+        plot_ly(x = ~age, y = ~diff_lmr) %>%
+        add_lines(showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~paste0(
+            "Age: ", age, 
+            '\nLog mortalities: ', round(B, 3), ' - ', round(A, 3), ' = ', round(diff_lmr, 3),
+            '\nDeaths per 10,000: ', round(10000 * 10^B, 0), ' - ', round(10000 * 10^A, 0), 
+            "\nso ", 
+            ifelse(
+              B > A,
+              paste0( round(10000 * (10^B - 10^A),0), " more deaths"),
+              paste0( round(10000 * (10^A - 10^B),0), " fewer deaths")
+            )
+          )                
+        ) 
+      
+      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+        layout(
+          yaxis = list(
+            title = "Difference in log mortalities",
+            range = c(-absmax, absmax)
+          ),
+          xaxis = list(
+            title = paste0("Difference by year at age ", this_age)
+            ),
+          xaxis2 = list(
+            title = paste0("Difference by age in year ", this_year), 
+            range = c(0, 100)
+            ),
+          xaxis3 = list(
+            title = paste0("Difference by age for ", this_cohort, " birth cohort"),
+            range = c(0, 100)
+            ),
+          title = paste0(
+            "Differences in log mortality between population groups in year ", this_year, " and age ", this_age),
+          showlegend = FALSE
+        )
+    }    
+    return(p)
+  })
+  
+  output$tadpole_plot <- renderPlotly({
+    
+    browser()
+    
+    dta_highlight <- hmd_e0 %>% 
+      filter(code == input$tadpole_highlight) %>% 
+      filter(gender == "female") %>% 
+      filter(year >= input$period_limits[1] - 1, year <= input$period_limits[2]) %>% 
+      arrange(year) %>% 
+      mutate(delta_e0 = e0 - lag(e0)) %>% 
+      mutate(newness = year - min(year)) %>% 
+      mutate(newness = newness / max(newness))
+    
+    p <- dta_highlight %>% 
+      plot_ly(data = ., x = ~e0, y = ~delta_e0, opacity = ~newness) %>% # doesn't work but some deeper level hack possible I think
+      add_lines()
+
+    return(p)
+  })
+  
+  
 })
