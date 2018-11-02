@@ -15,21 +15,12 @@ library(shiny)
 codes_named <- read_rds("data/codes_named.rds")
 # Define UI for application that draws a histogram
 shinyUI(fluidPage(
-  
   # Application title
   titlePanel("Human Mortality Database Explorer"),
   
   # Sidebar with a slider input for number of bins 
   sidebarLayout(
     sidebarPanel(
-<<<<<<< HEAD
-       selectInput("code_select",
-                   "Select country of interest",
-                   choices = codes_named,
-                   selected = "GBR_SCO",
-                   multiple = FALSE),
-       conditionalPanel("input.tabset_1=='Mortality' || input.tabset_1=='Population' || input.tabset_1 =='Mortality Change'",
-=======
       conditionalPanel("input.tabset_1 !='Mortality Group Comparisons' & input.tabset_1 != 'Tadpole Charts'",
          selectInput("code_select",
                      "Select country of interest",
@@ -66,7 +57,6 @@ shinyUI(fluidPage(
                      multiple = TRUE)                 
       ),
        conditionalPanel("input.tabset_1=='Mortality' || input.tabset_1=='Population' || input.tabset_1=='Mortality Group Comparisons'",
->>>>>>> 4e61ea211aa2e6388f513c498c30a11b20fed9e2
           selectInput("gender_select",
                       "Select gender of interest",
                       choices = c("Male", "Female", "Total"),
@@ -151,12 +141,11 @@ shinyUI(fluidPage(
        tabPanel(title = "Population Sex Ratios",
           plotlyOutput("pop_ratio_surface")
       ),
-<<<<<<< HEAD
+
       tabPanel(title = "Mortality Change",
           plotlyOutput("diff_mort_surface"),
           actionButton("redraw_mort_surface", "Click to redraw surface")
-               )
-=======
+               ),
       tabPanel(
         title = "Mortality Group Comparisons",
         plotlyOutput("mort_group_surface"),
@@ -167,8 +156,7 @@ shinyUI(fluidPage(
         plotlyOutput("tadpole_plot")
         
       )
->>>>>>> 4e61ea211aa2e6388f513c498c30a11b20fed9e2
     )
-    )
-))
+  ))
+  )
 )
