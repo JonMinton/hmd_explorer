@@ -59,6 +59,14 @@ hmd_e0 <- data_frame(
   gather(key = "gender", value = "e0", Female:Total)
 
 
+# Code to make this data available for app
+# names(hmd_e0) <- tolower(names(hmd_e0))
+# 
+# hmd_e0 <- hmd_e0 %>% 
+#   mutate(gender = tolower(gender))
+# 
+# write_csv(x = hmd_e0, path = "hmd_explorer/data/hmd_e0.csv")
+
 ```
 
 Now to visualise
