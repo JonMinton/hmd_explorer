@@ -16,6 +16,15 @@ names(full_data) <- tolower(names(full_data))
 
 codes_named <- read_rds("data/codes_named.rds")
 
+hmd_e0 <- read_csv("data/hmd_e0.csv") 
+
+names(hmd_e0) <- tolower(names(hmd_e0))
+
+hmd_e0 <- hmd_e0 %>% 
+  mutate(gender = tolower(gender))
+
+
+
 ### FUNCTIONS 
 
 make_z_list_pop <- function(X, what = "num_population"){
@@ -902,6 +911,26 @@ shinyServer(function(input, output){
           showlegend = FALSE
         )
     }    
+    return(p)
+  })
+  
+  output$tadpole_plot <- renderPlotly({
+    
+    browser()
+    
+    dta_highlight <- hmd_e0 %>% 
+      filter(code == input$tadpole_highlight) %>% 
+      filter(gender == "female") %>% 
+      filter(year >= input$period_limits[1] - 1, year <= input$period_limits[2]) %>% 
+      arrange(year) %>% 
+      mutate(delta_e0 = e0 - lag(e0)) %>% 
+      mutate(newness = year - min(year)) %>% 
+      mutate(newness = newness / max(newness))
+    
+    p <- dta_highlight %>% 
+      plot_ly(data = ., x = ~e0, y = ~delta_e0, opacity = ~newness) %>% # doesn't work but some deeper level hack possible I think
+      add_lines()
+
     return(p)
   })
   
