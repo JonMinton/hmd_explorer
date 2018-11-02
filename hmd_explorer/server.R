@@ -808,10 +808,9 @@ shinyServer(function(input, output){
   
   
   output$mort_group_subplot <- renderPlotly({
-#    req(output$mort_group_subplot)
-    cat(file=stderr(), "the value of recalc is ", input$recalc,"\n")   
-    s <- event_data("plotly_click", source = "mort_group_surface")
-    cat(file=stderr(), "s ", ifelse(is.null(s), "is", "is not"), "NULL\n")   
+    # cat(file=stderr(), "the value of recalc is ", input$recalc,"\n")   
+    # s <- event_data("plotly_click", source = "mort_group_surface")
+    # cat(file=stderr(), "s ", ifelse(is.null(s), "is", "is not"), "NULL\n")   
 
     if(is.null(s)) {return(NULL)} else {
       diffs <- newdata() %>% 
