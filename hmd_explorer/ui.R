@@ -63,7 +63,18 @@ shinyUI(fluidPage(
                      "Check to limit year range",
                      value = F
        ),
-       conditionalPanel("input.limit_period == true",
+      conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
+        checkboxInput("limit_diffz",
+                      "Check to set range for differences shown",
+                      value = F)
+      ),
+      conditionalPanel("input.limit_diffz == true",
+        sliderInput("diffz_limits",
+                    "Select range of differences to display",
+                    min = -4, max = 4, step = 0.1,
+                    value = c(-3, 3))
+      ),
+      conditionalPanel("input.limit_period == true",
           sliderInput("period_limits", sep = "",
                       "Select range of years",
                       min = 1750, max = 2020, step = 1, 
@@ -76,12 +87,15 @@ shinyUI(fluidPage(
                       value = 3
                       )              
       ),
-      conditionalPanel("input.tabset_1 == 'Mortality Sex Ratios' || input.tabset_1 == 'Population Sex Ratios'",
+      conditionalPanel("input.tabset_1 == 'Mortality Sex Ratios' || input.tabset_1 == 'Population Sex Ratios' || input.tabset_1 == 'Mortality Group Comparisons'",
          numericInput("small_n_correction", 
           "Add small value to cells",
             min = 0, value = 50, max = 10000
         )              
-      )       
+      ),
+      conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
+        actionButton("recalc", "Click to recalculate with new selection")                
+      )
        
     ),
 
@@ -105,7 +119,8 @@ shinyUI(fluidPage(
       ),
       tabPanel(
         title = "Mortality Group Comparisons",
-        plotlyOutput("mort_group_surface")
+        plotlyOutput("mort_group_surface"),
+        plotlyOutput("mort_group_subplot")
       )
     )
     )
