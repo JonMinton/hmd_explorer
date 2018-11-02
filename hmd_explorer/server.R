@@ -33,7 +33,8 @@ make_z_list_pop <- function(X, what = "num_population"){
   out <- list(age = ages, year = years, vals = val_mtrx)
 }
 
-make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
+make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10, diff = 0, smooth = T){
+  
   tmp <- X %>% 
     select(year = year, age = age, n = num_deaths, N = exposure) 
   
@@ -48,9 +49,36 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
       mutate(val = (n + adjust) / (N+adjust))
   }
   
-  out_df %>% 
-    select(year, age, val) %>% 
-    spread(age, val) -> tmp
+
+  # When the difference option is selected (for mortality differencing)
+  if (diff > 0){
+    if (smooth == T){
+      out_df %>% 
+        select(year, age, val) %>% 
+        group_by(year) %>% 
+        arrange(age) %>% 
+        mutate(lg2 = lag(val, 2), lg1 = lag(val, 1), ld1 = lead(val, 1), ld2 = lead(val, 2)) %>% 
+        mutate(sm_val = (lg2 + lg1 + val + ld1 + ld2) / 5
+               
+        ) %>%  # Smooths age-specific values by mean of neighbouring ages
+        ungroup() %>%
+        filter(!is.na(sm_val)) %>% 
+        select(year, age, val = sm_val) -> out_df
+    }
+    
+    out_df %>% 
+      select(year, age, val) %>% 
+      group_by(age) %>% 
+      mutate(val = val - lag(val, diff)) %>% 
+      filter(!is.na(val)) %>% 
+      ungroup() %>% 
+      spread(age, val) -> tmp
+  } else {
+    out_df %>% 
+      select(year, age, val) %>% 
+      spread(age, val) -> tmp
+  }
+  
   
   years <- tmp$year
   tmp$year <- NULL
@@ -63,22 +91,65 @@ make_z_list <- function(X, what = "lmr_k", adjust = 0, k = 10){
 
 # Define server logic required to draw a histogram
 shinyServer(function(input, output){
-   
+  
+  recalc_mort_surface <- eventReactive(input$redraw_mort_surface,
+                {
+                  dta_ss <- full_data %>% 
+                    filter(code == input$code_select) %>% 
+                    filter(gender == input$gender_select) 
+                  
+
+                  if(input$limit_age){
+                    dta_ss <- dta_ss %>% 
+                      filter(age >= input$age_limits[1], age <= input$age_limits[2])
+                  }    
+                  if (input$limit_period){
+                    dta_ss <- dta_ss %>% 
+                      filter(year >= input$period_limits[1], year <= input$period_limits[2])
+                  }
+                  return(dta_ss)
+                }
+  )
+  
+  recalc_pop_surface <- eventReactive(input$redraw_pop_surface,
+      {
+
+        this_code <- input$code_select
+        this_gender <- input$gender_select
+        
+          if (this_gender == "Total"){
+            
+            dta_ss <- full_data %>% 
+              filter(code == this_code) %>% 
+              filter(gender != "Total") %>% 
+              group_by(code, age, year) %>% 
+              mutate(cumulative_pop = cumsum(num_population)) %>% 
+              ungroup()
+            
+          } else {
+            dta_ss <- full_data %>% 
+              filter(code == this_code) %>% 
+              filter(gender == this_gender) 
+          }
+          
+          
+          if(input$limit_age){
+            dta_ss <- dta_ss %>%
+              filter(age >= input$age_limits[1], age <= input$age_limits[2])
+          }
+          
+          if (input$limit_period){
+            dta_ss <- dta_ss %>%
+              filter(year >= input$period_limits[1], year <= input$period_limits[2])
+          }
+        
+        return(dta_ss)
+      })
+ ## Mort surface 
   output$mort_surface <- renderPlotly({
 
-    dta_ss <- full_data %>% 
-      filter(code == input$code_select) %>% 
-      filter(gender == input$gender_select) 
-
-
-    if(input$limit_age){
-      dta_ss <- dta_ss %>% 
-        filter(age >= input$age_limits[1], age <= input$age_limits[2])
-    }    
-    if (input$limit_period){
-      dta_ss <- dta_ss %>% 
-        filter(year >= input$period_limits[1], year <= input$period_limits[2])
-    }
+    dta_ss <- recalc_mort_surface()
+    if (is.null(dta_ss)) {return(NULL)}
     
     dta_ss <- dta_ss %>% 
       group_by(code, gender) %>% 
@@ -129,9 +200,77 @@ shinyServer(function(input, output){
 
     return(p)
   })
+  
+  output$diff_mort_surface <- renderPlotly({
+    
+    dta_ss <- recalc_mort_surface()
+    
+    if (is.null(dta_ss)) {return(NULL)}
+    
+    dta_ss <- dta_ss %>% 
+      group_by(code, gender) %>% 
+      nest()
+    
+    # set diff to other values if required
+    z_list <- dta_ss %>% 
+      mutate(lmr_list = map(data, make_z_list, adjust = 0.5, diff = 1))
+    
+    
+    xx <- z_list[["lmr_list"]][[1]][["age"]]
+    yy <- z_list[["lmr_list"]][[1]][["year"]]
+    zz <- 10^z_list[["lmr_list"]][[1]][["vals"]]
+    
+    n_ages <- length(xx)
+    n_years <- length(yy)
+    
+    zc <- z_list[["lmr_list"]][[1]][["vals"]]
+    p <-   plot_ly(
+      x = ~xx,
+      y = ~yy,
+      z = ~zz,
+      surfacecolor = ~zc,
+      source = "diff_mort_surface"
+    ) %>% add_surface(
+      colorbar = list(
+        title = "Change in Log Mortality rate"
+      )
+    ) %>% 
+      layout(
+        scene = list(
+          zaxis = list(
+            title = "Mortality rate change",
+            type = "log", 
+            autorange = TRUE
+          ),
+          xaxis = list(
+            title = "age in years"
+          ),
+          yaxis = list(
+            title = "year"
+          ),
+          aspectratio = list(
+            x = n_ages / n_years, y = 1, z = 0.5
+          )
+        )
+      )
+    
+    
+    return(p)
+  })
+  
   # 
   output$mort_subplot <- renderPlotly({
-    s <- event_data("plotly_hover", source = "mort_surface")
+    s1 <- event_data("plotly_hover", source = "mort_surface")
+    
+    # set precedence so if the surface is clicked this overrides 
+    # plotly_hover
+    
+    s2 <- event_data(event = "plotly_click", source = "mort_surface")
+    
+    if (length(s2) != 0){
+      s <- s2
+    } else {s <- s1}
+    
     if (length(s) == 0){ return(NULL)} else {
 
       this_age <- s$x
@@ -192,35 +331,13 @@ shinyServer(function(input, output){
   
   output$pop_surface <- renderPlotly({
 
-    this_code <- input$code_select
-    this_gender <- input$gender_select
+    this_code <- isolate(input$code_select)
+    this_gender <- isolate(input$gender_select)
     
-    if (this_gender == "Total"){
-      
-      dta_ss <- full_data %>% 
-        filter(code == this_code) %>% 
-        filter(gender != "Total") %>% 
-        group_by(code, age, year) %>% 
-        mutate(cumulative_pop = cumsum(num_population)) %>% 
-        ungroup()
-      
-    } else {
-      dta_ss <- full_data %>% 
-        filter(code == this_code) %>% 
-        filter(gender == this_gender) 
-    }
-
-
-    if(input$limit_age){
-      dta_ss <- dta_ss %>%
-        filter(age >= input$age_limits[1], age <= input$age_limits[2])
-    }
-
-    if (input$limit_period){
-      dta_ss <- dta_ss %>%
-        filter(year >= input$period_limits[1], year <= input$period_limits[2])
-    }
-
+    dta_ss <- recalc_pop_surface()
+    
+    if (is.null(dta_ss)) {return(NULL)}
+    
     if (this_gender == "Total"){
       
       z_list <- dta_ss %>% 
@@ -247,7 +364,8 @@ shinyServer(function(input, output){
       n_years <- length(yy)
       
       p <- plot_ly(
-        showscale = FALSE
+        showscale = FALSE,
+        source = "pop_surface"
         
       ) %>% 
       add_surface(
@@ -305,7 +423,8 @@ shinyServer(function(input, output){
         x = ~xx,
         y = ~yy,
         z = ~zz,
-        surfacecolor = ~zz
+        surfacecolor = ~zz,
+        source = "pop_surface"
       ) %>% add_surface(
         colorbar = list(
           title = "Population"
@@ -335,7 +454,16 @@ shinyServer(function(input, output){
 
   output$pop_subplot <- renderPlotly({
 
-    s <- event_data("plotly_hover")
+    s1 <- event_data("plotly_hover", source = "mort_surface")
+    
+    # set precedence so if the surface is clicked this overrides 
+    # plotly_hover
+    
+    s2 <- event_data(event = "plotly_click", source = "mort_surface")
+    
+    if (length(s2) != 0){
+      s <- s2
+    } else {s <- s1}
     
     if (length(s) == 0){ return(NULL)} else {
 

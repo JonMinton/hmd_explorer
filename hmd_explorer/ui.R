@@ -27,7 +27,7 @@ shinyUI(fluidPage(
                    choices = codes_named,
                    selected = "GBR_SCO",
                    multiple = FALSE),
-       conditionalPanel("input.tabset_1=='Mortality' || input.tabset_1=='Population'",
+       conditionalPanel("input.tabset_1=='Mortality' || input.tabset_1=='Population' || input.tabset_1 =='Mortality Change'",
           selectInput("gender_select",
                       "Select gender of interest",
                       choices = c("Male", "Female", "Total"),
@@ -53,6 +53,13 @@ shinyUI(fluidPage(
                       min = 1750, max = 2020, step = 1, 
                       value = c(1750, 2020))              
        ),
+       conditionalPanel("input.tabset_1 =='Mortality Change'",
+                        sliderInput("period_diffs", sep = "",
+                                    "Select difference in years",
+                                    min = 0, max = 10, step = 1, 
+                                    value = 1)              
+       ),
+       
        conditionalPanel("input.tabset_1 == 'Mortality Sex Ratios' || input.tabset_1 == 'Population Sex Ratios'",
           sliderInput("ratio_limiter", 
                       "Select ratio limiter",
@@ -74,11 +81,13 @@ shinyUI(fluidPage(
       tabsetPanel(id = "tabset_1", type = "tab",
        tabPanel(title = "Mortality",
          plotlyOutput("mort_surface"),
-          plotlyOutput("mort_subplot")
+         actionButton("redraw_mort_surface", "Click to redraw surface"),
+         plotlyOutput("mort_subplot")
 
         ),
         tabPanel(title = "Population",
           plotlyOutput("pop_surface"),
+          actionButton("redraw_pop_surface", "Click to redraw surface"),
           plotlyOutput("pop_subplot")
         ),
        tabPanel(title = "Mortality Sex Ratios",
@@ -86,7 +95,11 @@ shinyUI(fluidPage(
         ),
        tabPanel(title = "Population Sex Ratios",
           plotlyOutput("pop_ratio_surface")
-      )
+      ),
+      tabPanel(title = "Mortality Change",
+          plotlyOutput("diff_mort_surface"),
+          actionButton("redraw_mort_surface", "Click to redraw surface")
+               )
     )
     )
 ))
