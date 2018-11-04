@@ -30,12 +30,22 @@ shinyUI(fluidPage(
                                    multiple = FALSE)
       ),
       conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
+                       selectInput("group_mode", "Show populations or population differences",
+                          choices = c("Differences in log mortality" = 'diff',
+                                      "Both populations individually" = 'both'),
+                          selected = "diff",
+                          multiple = FALSE
+                                   )                
+      ),
+      conditionalPanel("input.tabset_1 == 'Mortality Group Comparisons'",
                        selectInput("multi_code_select_B",
                                    "Select populations of interest",
                                    choices = codes_named,
                                    selected = "GBR_SCO",
                                    multiple = TRUE)                 
       ),
+      
+      
       conditionalPanel("input.tabset_1 == 'Tadpole Charts'",
                        selectInput("tadpole_highlight",
                                    "Select population to focus on",
@@ -57,6 +67,21 @@ shinyUI(fluidPage(
                                    selected = "GBRTENW",
                                    multiple = TRUE)                 
       ),
+      
+      conditionalPanel("input.group_mode == 'both'",
+                       sliderInput("group_B_alpha", "Select transparency of top pop list",
+                          value = 0.7,
+                          min = 0, max = 1, step = 0.1
+                       )                
+      ),
+
+            conditionalPanel("input.group_mode == 'both'",
+                       sliderInput("group_A_alpha", "Select transparency of bottom pop list",
+                                   value = 0.7,
+                                   min = 0, max = 1, step = 0.1
+                       )                
+      ),
+      
       conditionalPanel("input.tabset_1=='Mortality' || input.tabset_1=='Population' || input.tabset_1=='Mortality Group Comparisons'",
                        selectInput("gender_select",
                                    "Select gender of interest",
