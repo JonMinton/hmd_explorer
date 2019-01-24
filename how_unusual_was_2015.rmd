@@ -1,0 +1,352 @@
+---
+title: "Was the fall in Scottish life expectancy in 2014 a chance event?"
+output:
+  html_document:
+    df_print: paged
+  html_notebook: default
+  word_document: default
+---
+
+
+```{r}
+rm(list = ls())
+
+pacman::p_load(
+  tidyverse
+)
+
+dta_e0 <- read_csv("hmd_explorer/data/hmd_e0.csv")
+
+```
+
+
+# Introduction
+
+* Risk of rare ecological events, such as a severe flood, are often expressed in terms of frequencies rather than probabilities. For example, a 1-in-100 year flood means that a flood of that severity or greater is expected to have a 1% probability of occurring in any particular year. However, this expectation is dependent on the models used to predict such risks, and these models are dependent on assumptions about how much the past is a reliable guide to the future. 
+* It is now becoming clear that many 1-in-100 year ecological events are occurring much more often than once every 100 years. For example [examples here] . The appearance of many very rare events in quick succession suggests that the models are wrong: what used to be a 1-in-100 year event is now a 1-in-20 year or 1-in-10 year event instead. The fundamentals have shifted, and the past is a less reliable guide to the future than it used to be. 
+* In recent years there have been concerns about life expectancies in Scotland either falling from the previous year, or not improving. This is against a backdrop of life expectancies tending to improve almost every year for many generations. [EXAMPLES]
+* From 2014 to 2015 there was a notable fall in life expectancy in Scotland, by 0.30 years (3.6 months) for females and by 0.37 years (4.4 months) for males. This is in contrast to an average annual gain in life expectancy of 0.23 years (2.8 months) per year for females, and 0.23 years (2.7 months) per year for males, in Scotland since 1855; and an average gain of 0.18 years per year (2.2 months per year) for females and 0.20 years per year (2.4 months per year) for males, in the 60 year period between 1955 and 2014.
+* The aim of this short report is to explore how likely it was that Scotland's 2014-15 fall in life expectancy was simply a 'chance event', a bad outlier like a particularly severe flood, that 'just happens' once every few decades, without the long-term fundamental drift towards ever longer lives really having changed. We conclude by asking whether the fall in 2014-15, and (lack of) improvement in gains subsequently, should give us concern that, like '1-in-100 year' floods occurring surprisingly frequently in the last decade or so, rare events like the 2014-15 life expectancy fall are no longer as rare as they used to be, and that the kinds of gains in longevity experienced by previous generations will not be experienced by subsequent generations.
+
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  filter(year == 2015) %>% 
+  mutate(change_e0_months = change_e0 * 12)
+```
+
+# Methods
+
+* Data on life expectancy at birth ($e_0$) in Scotland was extracted from the Human Mortality Database for all available years (First year 1855, last year 2016). The annual change in life expectancy ($\Delta e_0$) was then calculated for each year by sex. Change in life expectancy was then plotted against time, to help understand how unusual the 2014-15 fall in life expectancy was in a longer term context. Based on visual exploration of the data, the 60 year period 1955-2014 was selected as providing a range of observations both long-term enough, and recent enough, for the 2015 annual fall to be compared against. 
+* The rarity, probability and estimated frequency of the fall in 2014-15 was estimated using the data from 1955-2014 in two ways: firstly by counting the number of years where annual falls in life expectancy were as or more severe than that seen in 2014-15, and secondly by using sample means and standard deviations of the life expectancy changes to produce a normal distribution function for each sex, and calculating the cumulative probability of falls in life expectancy as or more severe than the 2014-15 fall from the 1955-2014 distribution of annual changes.  
+
+# Results
+
+## Figure 1: Long term trend of change 
+
+* The figure below shows annual change in life expectancy in Scotland over time by sex. The point marking the 2014-15 fall is highlighted with a red point. Throughout the latter half of 19th century, and first half of the 20th century, there were much greater swings in annual changes in life expectancy than in the latter half of the 20th century and start of 21st century. Because high annual variability has not been observed for many decades, only data from 1955-2014 (highlighted grey) are used in subsequent analyses. [Though results with all data could be included in an appendix?] We can see from this figure that, though the 2014-15 fall in life expectancy is rare, it is not unprecedented in the 1955-2014 period.
+* Some summary numbers?
+
+
+```{r}
+
+dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  ggplot(aes(x = year, y = change_e0)) + 
+  geom_line() + geom_point() +
+  facet_grid(gender ~ .) + 
+  geom_hline(yintercept = 0) + 
+  scale_x_continuous(breaks = seq(1860, 2010, by = 10)) + 
+  annotate("rect", xmin = 1955, xmax = 2014, ymin = -Inf, ymax = Inf, alpha = 0.2) + 
+  labs(
+    title = "Annual changes in life expectancy over time in Scotland, 1855-2016",
+    subtitle = "Highlighted region: 1955-2014. Highlighted point: 2015",
+    caption = "Source: HMD",
+    x = "Year", 
+    y = "Change in life expectancy from previous year in years"
+  ) + 
+  geom_point(
+    aes(x = year, y = change_e0),
+    size = 2, shape = 15, colour = "red",
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+    
+  )
+
+```
+
+## Figure 2: Distribution
+
+* Figure 2 below shows the distribution of annual changes in life expectancy over the 1955-2014 period. Each observation is represented as a vertical 'tick', and the years corresponding to the two largest annual increases and declines are labelled. The black vertical line indicates no change from the previous year, the thinner blue vertical line shows the average annual change over the period, and the dashed red line indicates the change observed in 2014-15. The grey shape above the points shows the density of the distribution.
+* We can see from this that for males, only one year, 1967-68, has seen a sharper annual fall in life expectancy than the change in 2014-15. We can also see that 1967-68 was preceeded by an especially high rate of improvement the previous year, 1966-67. Over the 60 year period, only one year saw a faster fall in life expectancy for males, whereas for females four years saw greater annual declines than occurred in 2014-15.
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  filter(between(year, 1955, 2014)) %>% 
+  ggplot(aes(x = change_e0)) + 
+  stat_density(alpha = 0.2) +
+  geom_rug() + 
+  facet_grid(gender ~ .) +
+  geom_vline(xintercept = 0, size = 1.5) +
+  geom_vline(
+    aes(xintercept =change_e0),
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015),
+    colour = "red",
+    linetype = "dashed"
+  ) +
+  geom_vline(
+    aes(xintercept =mean_change_e0),
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(between(year, 1955, 2014)) %>% 
+      group_by(gender) %>% 
+      summarise(mean_change_e0 = mean(change_e0)) %>% 
+      ungroup(),
+    colour = "blue"
+  ) + 
+  labs(
+    title = "Range of falls and gains in annual life expectancy in Scotland, 1955-2014",
+    x = "Change in life expectancy from previous year in years",
+    y = "Density of distribution of changes"
+  ) +
+  geom_text(
+    aes(x = mean_change_e0), y = 0.75, 
+    label = "Average\nChange", fontface = "bold", colour = "white",
+    nudge_y = 0.01, nudge_x = 0.0025,
+    data = dta_e0 %>% 
+          filter(code == "GBR_SCO") %>% 
+          filter(gender != "total") %>% 
+          group_by(gender) %>% 
+          arrange(year) %>% 
+          mutate(change_e0 = e0 - lag(e0)) %>% 
+          filter(between(year, 1955, 2014)) %>% 
+          group_by(gender) %>% 
+          summarise(mean_change_e0 = mean(change_e0)) %>% 
+          ungroup()
+  ) +
+  geom_text(
+    aes(x = mean_change_e0), y = 0.75, 
+    label = "Average\nChange", fontface = "bold",
+    data = dta_e0 %>% 
+          filter(code == "GBR_SCO") %>% 
+          filter(gender != "total") %>% 
+          group_by(gender) %>% 
+          arrange(year) %>% 
+          mutate(change_e0 = e0 - lag(e0)) %>% 
+          filter(between(year, 1955, 2014)) %>% 
+          group_by(gender) %>% 
+          summarise(mean_change_e0 = mean(change_e0)) %>% 
+          ungroup()
+            ) +
+  geom_text(
+    aes(x = change_e0), y = 0.75, 
+    label = "Change from\n2014-2015", fontface = "bold", colour = "white",
+    nudge_y = 0.01, nudge_x = 0.0025,
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0), y = 0.75, 
+    label = "Change from\n2014-2015", fontface = "bold",
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0), y = 0.75, 
+    label = "Change from\n2014-2015", fontface = "bold",
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0, label = year), y = 0.1,
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(between(year, 1955, 2014)) %>% 
+      mutate(rank_ch = rank(change_e0)) %>% 
+      filter(rank_ch <= 2 | rank_ch >= 59)
+  )
+    
+
+
+
+```
+
+## Modelling
+
+## How rare was the 2014-15 change? The simple approach
+
+* As there was one event as or more severe than the 2014-15 fall for males, and four events as more severe than the 2014-15 fall for females, and there were 60 observations for each sex, the simple estimates for the 2014-15 fall are 1/60 (around 1.7%) for males and 4/60 (around 6.7%) for females. 
+* If needed, credible intervals for the above could be produced through bootstrapping. (i.e. repeatedly resampling from the same data).
+
+## How rare was the 2014-15 change? A slightly more complicated approach
+
+The table below shows the mean and standard deviation of the annual changes that occurred between 1955-2014. The average (mean) annual improvement was 0.18 years per year for females and 0.20 years per year for males, with a standard deviation of 0.31 for females and 0.27 for males. These values are used to estimate the probability, and so expected frequency, of the 2014-15 decline, using a normal distribution. This approach suggestes there is a 6.0% change of an event as or more severe than the 2014-15 decline for females, and a 1.7% probability of observing an event as or more severe than the 2014-15 decline for males. This suggests the 2014-15 fall was a 1-in-17 year event for females, and a 1-in-60 year event for males.
+
+```{r}
+summary_stats <- dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  filter(between(year, 1955, 2014)) %>% 
+  group_by(gender) %>% 
+  summarise(
+    mean_ch_e0 = mean(change_e0),
+    sd_ch_e0 = sd(change_e0)
+  ) %>% 
+  ungroup()
+
+summary_stats
+```
+
+
+```{r}
+summary_stats %>% 
+  left_join(
+    dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015) %>% 
+      select(gender, change_in_2015 = change_e0)
+  ) %>% 
+  mutate(
+    prob_2015_chance = pmap_dbl(
+      list(
+        q = change_in_2015,
+        mean = mean_ch_e0,
+        sd = sd_ch_e0
+      ),
+      .f = pnorm
+    ),
+    one_in = 1/ prob_2015_chance,
+    prob_no_improvovement = pmap_dbl(
+      list(
+        q = c(0,0),
+        mean = mean_ch_e0,
+        sd = sd_ch_e0
+      ),
+      .f = pnorm
+    )
+  )
+```
+
+# Discussion 
+
+* The simple analyses above has indicated that the fall in life expectancy in Scotland from 2014-15 was rare but not unprecedented. It was a rare event for both sexes, but more so for males than females. Considering the ups and downs in life expectancy changes in Scotland from 1955-2014, a fall in life expectancy as or more severe than that seen in 2014-15 could be expected to occur once every 17 years on average for females, and once every 60 years on average for males. 
+* Limitations
+* Comparison with other findings
+* This result might be taken to suggest that the possibility that the 2014-15 was simply a 'chance event', rather than the start of a long-term slowdown or stagnation in improving life expectancy, cannot be ruled out. Variation in mortality rates from one year to the next can occur due to random seasonal variation in temperature and infectious diseases, especially influenza. [REFS]
+* However, perhaps more unusual and concerning than the fall in life expectancy from 2014-15 was the lack of any substantial increase in life expectancy which occurred in the following year. This should be concerning because, unlike the very simple modelling approach used for illustration and estimation above, changes in life expectancy over a year are likely to be *negatively correlated* (rather than *uncorrelated*) with changes in the previous year. 
+* Analysis of annual mortality changes *does* suggest that the data for Scotland exhibits this negative correlation pattern. (See appendix?) This means the lack of improvement in life expectancy from 2015-16, after the substantial fall in life expectancy in 2014-15, is particularly unusual, and that recent trends in changes in life expectancy should be monitored and analysed very carefully to determine whether 2014-15 represents a change in the 'population climate', a chance event, or a combination of both.
+* Final summary statement
+
+
+# Appendix? Quick exploration: negative autocorrelation
+
+
+The model above assumes that the change in life expectancy in any year is not dependent on that in the previous year. 
+Put another way, the model is 'memoryless', and has not predictor terms (i.e. 'right hand' terms in  regression formula). 
+The next simplest model approach would be to build a model that includes the previous year's change as a predictor variable. So, a one year lag term. 
+
+The prior hypothesis - consistent with 'harvesting' - is that the change in one year will be negatively correlated with the previous year.
+
+This can be done by building a linear regression model with the previous year as a predictor variable
+
+
+```{r}
+mdls <- dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(last_change_e0 = lag(change_e0)) %>% 
+  filter(between(year, 1955, 2014)) %>% 
+  group_by(gender) %>% 
+  nest() %>% 
+  mutate(mdl_nolag = map(data, ~lm(change_e0 ~ 1, data = .))) %>% 
+  mutate(mdl_lag = map(data, ~lm(change_e0 ~ last_change_e0, data = .)))  %>% 
+  mutate(anova = map2(mdl_nolag, mdl_lag, anova)) %>% 
+  mutate(p_autocorrelation = map_dbl(anova, ~.[2,6])) %>% 
+  mutate(model_lag_tidy = map(mdl_lag, broom::tidy))
+
+lag_mdl_summary <- mdls %>% 
+  select(gender, model_lag_tidy) %>% 
+  unnest()
+  
+p_autocorr_female <- mdls %>% filter(gender == "female") %>% pull("p_autocorrelation")
+p_autocorr_male <- mdls %>% filter(gender == "male") %>% pull("p_autocorrelation")
+
+```
+
+
+Two model specifications have been built. 
+
+* `mdl_nolag` is effectively the model specification used above, which has no predictor terms. 
+* `mdl_lag` includes the previous year's change as a predictor variable.
+
+As `mdl_nolag` is the same as `mdl_lag` with one of its terms set to zero, `mdl_nolag` is a restricted version of `mdl_lag`, and so ANOVA can be used to test whether the move from the unrestricted model (`mdl_nolag`) to the restricted (`mdl_lag`) is justified in terms of improved fit to the data. In effect, the ANOVA test gives us an estimated probability that the data contains autocorrelation. These probabilities are `r round(p_autocorr_female, 5)` for females, and `r round(p_autocorr_male, 5)` for males, and so provide strong evidence that autocorrelation exists in the data. 
+
+The specific type of autocorrelation of interest is negative autocorrelation. Negative autocorrelation would be present if the `estimate` column for the term `last_change_e0` were negative. The coefficient of this term is statistically significant at p < 0.05 if the corresponding row in the column `p.value` is below 0.05. We can see from the table below that both of these conditions are true, though the magnitude of the negative autocorrelation is larger for females than males, and the associated p value for females much smaller than for males. 
+
+
+```{r}
+
+lag_mdl_summary
+```
+
+
+One conclusion we might draw from this evidence that the data contains negative autocorrelation is that the most troubling aspect of changes in life expectancy in Scotland since 2014 is not necessarily the fall in life expectancy from 2014-15, but the lack of any notable recovery in life expectancy increases from 2015-16. Negative autocorrelation would imply that a year showing a substantial fall in life expectancy is more likely to be followed by a substantial improvement in life expectancy, above the long-term average improvement, the following year. Instead, life expectancy improvement in 2015-16 was close to zero. 
+
