@@ -84,9 +84,7 @@ dta_e0 %>%
       arrange(year) %>% 
       mutate(change_e0 = e0 - lag(e0)) %>% 
       filter(year == 2015)
-    
   )
-
 ```
 
 ## Figure 2: Distribution
@@ -349,4 +347,504 @@ lag_mdl_summary
 
 
 One conclusion we might draw from this evidence that the data contains negative autocorrelation is that the most troubling aspect of changes in life expectancy in Scotland since 2014 is not necessarily the fall in life expectancy from 2014-15, but the lack of any notable recovery in life expectancy increases from 2015-16. Negative autocorrelation would imply that a year showing a substantial fall in life expectancy is more likely to be followed by a substantial improvement in life expectancy, above the long-term average improvement, the following year. Instead, life expectancy improvement in 2015-16 was close to zero. 
+
+# Appendix: What if all available years were used for Scotland? 
+
+This supplementary analysis will explore the effect of using all available years for Scotland, rather than 1955-2014. This should be useful for avoiding any accusation of 'cherry picking' the selection of years.
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  filter(between(year, 1855, 2014)) %>% 
+  ggplot(aes(x = change_e0)) + 
+  stat_density(alpha = 0.2) +
+  geom_rug() + 
+  facet_grid(gender ~ .) +
+  geom_vline(xintercept = 0, size = 1.5) +
+  geom_vline(
+    aes(xintercept =change_e0),
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015),
+    colour = "red",
+    linetype = "dashed"
+  ) +
+  geom_vline(
+    aes(xintercept =mean_change_e0),
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(between(year, 1855, 2014)) %>% 
+      group_by(gender) %>% 
+      summarise(mean_change_e0 = mean(change_e0, na.rm = T)) %>% 
+      ungroup(),
+    colour = "blue"
+  ) + 
+  labs(
+    title = "Range of falls and gains in annual life expectancy in Scotland, 1855-2014",
+    x = "Change in life expectancy from previous year in years",
+    y = "Density of distribution of changes"
+  ) +
+  geom_text(
+    aes(x = mean_change_e0), y = 0.15, 
+    label = "Average\nChange", fontface = "bold", colour = "white",
+    nudge_y = 0.01, nudge_x = 0.0025,
+    data = dta_e0 %>% 
+          filter(code == "GBR_SCO") %>% 
+          filter(gender != "total") %>% 
+          group_by(gender) %>% 
+          arrange(year) %>% 
+          mutate(change_e0 = e0 - lag(e0)) %>% 
+          filter(between(year, 1855, 2014)) %>% 
+          group_by(gender) %>% 
+          summarise(mean_change_e0 = mean(change_e0, na.rm = T)) %>% 
+          ungroup()
+  ) +
+  geom_text(
+    aes(x = mean_change_e0), y = 0.15, 
+    label = "Average\nChange", fontface = "bold",
+    data = dta_e0 %>% 
+          filter(code == "GBR_SCO") %>% 
+          filter(gender != "total") %>% 
+          group_by(gender) %>% 
+          arrange(year) %>% 
+          mutate(change_e0 = e0 - lag(e0)) %>% 
+          filter(between(year, 1855, 2014)) %>% 
+          group_by(gender) %>% 
+          summarise(mean_change_e0 = mean(change_e0, na.rm = T)) %>% 
+          ungroup()
+            ) +
+  geom_text(
+    aes(x = change_e0), y = 0.45, 
+    label = "Change from\n2014-2015", fontface = "bold", colour = "white",
+    nudge_y = 0.01, nudge_x = 0.0025,
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0), y = 0.45, 
+    label = "Change from\n2014-2015", fontface = "bold",
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0), y = 0.45, 
+    label = "Change from\n2014-2015", fontface = "bold",
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0, label = year), y = 0.1,
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(between(year, 1855, 2014)) %>% 
+      mutate(rank_ch = rank(change_e0)) %>% 
+      filter(rank_ch <= 2 | rank_ch >= 158)
+  )
+```
+
+
+It's clear that there used to be much more variability in annual changes before the Second World War than after, and that a Normal distribution is much less appropriate. However if summarising the data in this way the mean and sd are as follows:
+
+
+```{r}
+summary_stats_full <- dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  filter(between(year, 1855, 2014)) %>% 
+  group_by(gender) %>% 
+  summarise(
+    mean_ch_e0 = mean(change_e0, na.rm = T),
+    sd_ch_e0 = sd(change_e0, na.rm = T)
+  ) %>% 
+  ungroup()
+
+summary_stats_full
+
+
+```
+
+The mean increases were a bit higher, but the SDs were much, much higher.
+
+If making the assumption that the kind of extreme variability in annual changes observed in the 19th century and first half of the 20th century should still be considered relevant, then the probability of seeing a fall as or more severe than seen in 2014-15 falls to one-in-3. (See below)
+
+```{r}
+summary_stats_full %>% 
+  left_join(
+    dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015) %>% 
+      select(gender, change_in_2015 = change_e0)
+  ) %>% 
+  mutate(
+    prob_2015_chance = pmap_dbl(
+      list(
+        q = change_in_2015,
+        mean = mean_ch_e0,
+        sd = sd_ch_e0
+      ),
+      .f = pnorm
+    ),
+    one_in = 1/ prob_2015_chance,
+    prob_no_improvovement = pmap_dbl(
+      list(
+        q = c(0,0),
+        mean = mean_ch_e0,
+        sd = sd_ch_e0
+      ),
+      .f = pnorm
+    )
+  )
+
+```
+
+# Appendix: How does this compare with England & Wales?
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBRCENW") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  ggplot(aes(x = year, y = change_e0)) + 
+  geom_line() + geom_point() +
+  facet_grid(gender ~ .) + 
+  geom_hline(yintercept = 0) + 
+  scale_x_continuous(breaks = seq(1840, 2010, by = 10)) + 
+  annotate("rect", xmin = 1955, xmax = 2014, ymin = -Inf, ymax = Inf, alpha = 0.2) + 
+  labs(
+    title = "Annual changes in life expectancy over time in England & Wales, 1841-2016",
+    subtitle = "Highlighted region: 1955-2014. Highlighted point: 2015",
+    caption = "Source: HMD",
+    x = "Year", 
+    y = "Change in life expectancy from previous year in years"
+  ) + 
+  geom_point(
+    aes(x = year, y = change_e0),
+    size = 2, shape = 15, colour = "red",
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  )
+```
+
+
+The range of variability is much higher, due to much greater exposure to the 1918 influenza pandemic/end of First World War. Let's now look again just at the range starting 1955
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBRCENW") %>% 
+  filter(year >= 1955) %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  ggplot(aes(x = year, y = change_e0)) + 
+  geom_line() + geom_point() +
+  facet_grid(gender ~ .) + 
+  geom_hline(yintercept = 0) + 
+  scale_x_continuous(breaks = seq(1860, 2010, by = 10)) + 
+  labs(
+    title = "Annual changes in life expectancy over time in England & Wales, 1955-2016",
+    subtitle = "Highlighted point: 2015",
+    caption = "Source: HMD",
+    x = "Year", 
+    y = "Change in life expectancy from previous year in years"
+  ) + 
+  geom_point(
+    aes(x = year, y = change_e0),
+    size = 2, shape = 15, colour = "red",
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  )
+```
+
+
+* *Note*: This series might be worth doing to Scotland, too...
+
+
+Now to show the distribution in comparison to 2014-15
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBRCENW") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  filter(between(year, 1955, 2014)) %>% 
+  ggplot(aes(x = change_e0)) + 
+  stat_density(alpha = 0.2) +
+  geom_rug() + 
+  facet_grid(gender ~ .) +
+  geom_vline(xintercept = 0, size = 1.5) +
+  geom_vline(
+    aes(xintercept =change_e0),
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015),
+    colour = "red",
+    linetype = "dashed"
+  ) +
+  geom_vline(
+    aes(xintercept =mean_change_e0),
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(between(year, 1955, 2014)) %>% 
+      group_by(gender) %>% 
+      summarise(mean_change_e0 = mean(change_e0)) %>% 
+      ungroup(),
+    colour = "blue"
+  ) + 
+  labs(
+    title = "Range of falls and gains in annual life expectancy in England & Wales, 1955-2014",
+    x = "Change in life expectancy from previous year in years",
+    y = "Density of distribution of changes"
+  ) +
+  geom_text(
+    aes(x = mean_change_e0), y = 0.75, 
+    label = "Average\nChange", fontface = "bold", colour = "white",
+    nudge_y = 0.01, nudge_x = 0.0025,
+    data = dta_e0 %>% 
+          filter(code == "GBRCENW") %>% 
+          filter(gender != "total") %>% 
+          group_by(gender) %>% 
+          arrange(year) %>% 
+          mutate(change_e0 = e0 - lag(e0)) %>% 
+          filter(between(year, 1955, 2014)) %>% 
+          group_by(gender) %>% 
+          summarise(mean_change_e0 = mean(change_e0)) %>% 
+          ungroup()
+  ) +
+  geom_text(
+    aes(x = mean_change_e0), y = 0.75, 
+    label = "Average\nChange", fontface = "bold",
+    data = dta_e0 %>% 
+          filter(code == "GBRCENW") %>% 
+          filter(gender != "total") %>% 
+          group_by(gender) %>% 
+          arrange(year) %>% 
+          mutate(change_e0 = e0 - lag(e0)) %>% 
+          filter(between(year, 1955, 2014)) %>% 
+          group_by(gender) %>% 
+          summarise(mean_change_e0 = mean(change_e0)) %>% 
+          ungroup()
+            ) +
+  geom_text(
+    aes(x = change_e0), y = 0.75, 
+    label = "Change from\n2014-2015", fontface = "bold", colour = "white",
+    nudge_y = 0.01, nudge_x = 0.0025,
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0), y = 0.75, 
+    label = "Change from\n2014-2015", fontface = "bold",
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0), y = 0.75, 
+    label = "Change from\n2014-2015", fontface = "bold",
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  ) +
+  geom_text(
+    aes(x = change_e0, label = year), y = 0.1,
+    data = dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(between(year, 1955, 2014)) %>% 
+      mutate(rank_ch = rank(change_e0)) %>% 
+      filter(rank_ch <= 2 | rank_ch >= 59)
+  )
+```
+
+
+The 2014-15 fall looks to be a comparably rarer event for England & Wales than for Scotland. Let's quantify this
+
+
+```{r}
+summary_stats <- dta_e0 %>% 
+  filter(code == "GBRCENW") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  filter(between(year, 1955, 2014)) %>% 
+  group_by(gender) %>% 
+  summarise(
+    mean_ch_e0 = mean(change_e0),
+    sd_ch_e0 = sd(change_e0)
+  ) %>% 
+  ungroup()
+
+summary_stats
+```
+
+
+
+And now the estimated probability/frequency
+
+```{r}
+summary_stats %>% 
+  left_join(
+    dta_e0 %>% 
+      filter(code == "GBRCENW") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015) %>% 
+      select(gender, change_in_2015 = change_e0)
+  ) %>% 
+  mutate(
+    prob_2015_chance = pmap_dbl(
+      list(
+        q = change_in_2015,
+        mean = mean_ch_e0,
+        sd = sd_ch_e0
+      ),
+      .f = pnorm
+    ),
+    one_in = 1/ prob_2015_chance,
+    prob_no_improvovement = pmap_dbl(
+      list(
+        q = c(0,0),
+        mean = mean_ch_e0,
+        sd = sd_ch_e0
+      ),
+      .f = pnorm
+    )
+  )
+```
+
+The initial visual impression, based largely on just counting the ticks to the left of the red dashed line, was a bit misleading.
+
+The 2014-15 fall was a 1-in-27 year event  (cf 1-in-16 for Scotland) for males, and a 1-in-42 year event (cf 1-in-60) for females.  
+
+
+# Appendix: visual exploration of 1 year and 2 year autocorrelation 
+
+
+This section will visually look at autocorrelation of 1 and 2 lags in Scotland, and England & Wales
+
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(lag_1 = lag(change_e0)) %>% 
+  mutate(lag_2 = lag(change_e0, 2)) %>% 
+  filter(between(year, 1955, 2014)) %>%
+  gather(key = "lag", value = "value", lag_1, lag_2) %>% 
+  group_by(gender) %>% 
+  ggplot(aes(x = change_e0, y = value)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  facet_grid(lag ~ gender)
+```
+
+
+As might be expected, the autocorrelation with the previous year (`lag_1`) is stronger than the autocorrelation with two years previously (`lag_2`).
+
+Let's quantify this
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(lag_1 = lag(change_e0)) %>% 
+  mutate(lag_2 = lag(change_e0, 2)) %>% 
+  filter(between(year, 1955, 2014)) %>%
+  gather(key = "lag", value = "value", lag_1, lag_2) %>% 
+  group_by(gender, lag) %>% 
+  nest() %>% 
+  mutate(corr = map_dbl(data, ~ cor(.x[,c("change_e0", "value")]) %>% .[2,1])) %>% 
+  select(-data) %>% 
+  spread(lag, corr)
+```
+
+So, the change over a year is autocorrelated with the previous year's change, and more weakly for two years' prior. 
+
+The autocorrelation to the previous year's change is -0.47 for females and -0.29 for males. 
 
