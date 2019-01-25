@@ -1,5 +1,5 @@
 ---
-title: "Was the fall in Scottish life expectancy in 2014 a chance event?"
+title: "Was the fall in Scottish life expectancy in 2014-15 a chance event?"
 output:
   html_document:
     df_print: paged
@@ -54,7 +54,6 @@ dta_e0 %>%
 
 
 ```{r}
-
 dta_e0 %>% 
   filter(code == "GBR_SCO") %>% 
   filter(gender != "total") %>% 
@@ -86,6 +85,43 @@ dta_e0 %>%
       filter(year == 2015)
   )
 ```
+
+## Figure 1b: Change from 1955
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  filter(year >= 1955) %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  ggplot(aes(x = year, y = change_e0)) + 
+  geom_line() + geom_point() +
+  facet_grid(gender ~ .) + 
+  geom_hline(yintercept = 0) + 
+  scale_x_continuous(breaks = seq(1860, 2010, by = 10)) + 
+  labs(
+    title = "Annual changes in life expectancy over time in Scotland, 1955-2016",
+    subtitle = "Highlighted region: 1955-2014. Highlighted point: 2015",
+    caption = "Source: HMD",
+    x = "Year", 
+    y = "Change in life expectancy from previous year in years"
+  ) + 
+  geom_point(
+    aes(x = year, y = change_e0),
+    size = 2, shape = 15, colour = "red",
+    data = dta_e0 %>% 
+      filter(code == "GBR_SCO") %>% 
+      filter(gender != "total") %>% 
+      group_by(gender) %>% 
+      arrange(year) %>% 
+      mutate(change_e0 = e0 - lag(e0)) %>% 
+      filter(year == 2015)
+  )
+```
+
+
 
 ## Figure 2: Distribution
 
@@ -607,7 +643,6 @@ dta_e0 %>%
 ```
 
 
-* *Note*: This series might be worth doing to Scotland, too...
 
 
 Now to show the distribution in comparison to 2014-15
@@ -847,4 +882,50 @@ dta_e0 %>%
 So, the change over a year is autocorrelated with the previous year's change, and more weakly for two years' prior. 
 
 The autocorrelation to the previous year's change is -0.47 for females and -0.29 for males. 
+
+
+And now for England & Wales
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBRCENW") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(lag_1 = lag(change_e0)) %>% 
+  mutate(lag_2 = lag(change_e0, 2)) %>% 
+  filter(between(year, 1955, 2014)) %>%
+  gather(key = "lag", value = "value", lag_1, lag_2) %>% 
+  group_by(gender) %>% 
+  ggplot(aes(x = change_e0, y = value)) + 
+  geom_point() + 
+  geom_smooth(method = "lm") +
+  facet_grid(lag ~ gender)
+```
+
+Lag-2 autocorrelation looks even weaker for England & Wales than for Scotland. Again, let's quantify this 
+
+
+```{r}
+dta_e0 %>% 
+  filter(code == "GBRCENW") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(lag_1 = lag(change_e0)) %>% 
+  mutate(lag_2 = lag(change_e0, 2)) %>% 
+  filter(between(year, 1955, 2014)) %>%
+  gather(key = "lag", value = "value", lag_1, lag_2) %>% 
+  group_by(gender, lag) %>% 
+  nest() %>% 
+  mutate(corr = map_dbl(data, ~ cor(.x[,c("change_e0", "value")]) %>% .[2,1])) %>% 
+  select(-data) %>% 
+  spread(lag, corr)
+```
+
+Pretty much no lag-2 autocorrelation.
+
+But a very similar magnitude of lag-1 autocorrelation by sex as for Scotland.
 
