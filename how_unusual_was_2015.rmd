@@ -1009,3 +1009,78 @@ ggsave("support/all_countries_change_since_1955.png", height = 200, width = 25, 
 
 
 ```
+
+## Comparison of 0, 1, and 2 lag models for all countries
+
+
+The aim of this section is to generalise the analyses shown earlier for Scotland, and England & Wales, to all HMD countries 
+
+```{r}
+dta_e0 %>% 
+  filter(!(code %in% c("NZL_NM" ,"NZL_MA"))) %>% 
+  filter(gender != "total") %>% 
+  group_by(code, gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>%
+  mutate(lag_1 = lag(change_e0)) %>% 
+  mutate(lag_2 = lag(change_e0, 2)) %>%
+  filter(between(year, 1955, 2014)) %>% 
+  group_by(code, gender) %>% 
+  nest() %>% 
+  mutate(
+    m0 = map(data, ~lm(change_e0 ~ 1,              data = .)),
+    m1 = map(data, ~lm(change_e0 ~ lag_1,          data = .)),
+    m2 = map(data, ~lm(change_e0 ~ lag_1 + lag_2,  data = .))
+  ) %>% 
+  select(-data) %>% 
+  gather(key = "lag", value = "model", m0:m2) %>% 
+  mutate(
+    aic = map_dbl(model, AIC),
+    bic = map_dbl(model, BIC)
+  ) %>% 
+  mutate(lag = substr(lag, 2,2) %>% as.integer) %>% 
+  ggplot(aes(x = lag, y = bic, group = gender, colour = gender, shape = gender)) + 
+  facet_wrap(~code, scales = "free_y") + 
+  geom_point() + geom_line()
+  
+
+```
+
+
+
+This indicates that a simple 'oscillatory' pattern of annual changes - a bad year predicting a good year and vice versa - is far from a universal pattern, and often differs significantly between genders even in the same country. Often, but not always, more terms lead to a better penalised model fit (using BIC, which tends to be more conservative than AIC). 
+
+
+Let's now explore simply the magnitude and direction of lag 1 negative autocorrelation in the data
+
+
+```{r}
+dta_e0 %>% 
+  filter(!(code %in% c("NZL_NM" ,"NZL_MA"))) %>% 
+  filter(gender != "total") %>% 
+  group_by(code, gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(lag_1 = lag(change_e0)) %>% 
+  mutate(lag_2 = lag(change_e0, 2)) %>% 
+  filter(between(year, 1955, 2014)) %>%
+  gather(key = "lag", value = "value", lag_1, lag_2) %>% 
+  group_by(code, gender, lag) %>% 
+  nest() %>% 
+  mutate(corr = map_dbl(data, ~ cor(.x[,c("change_e0", "value")]) %>% .[2,1])) %>% 
+  select(-data) %>% 
+  spread(lag, corr) %>% 
+  filter(!is.na(lag_1)) %>% 
+  ggplot(aes(x = lag_1, y = reorder(code, lag_1), shape = gender, colour = gender)) + 
+  geom_point() +
+  geom_vline(xintercept = 0) + 
+  labs(
+    x = "Correlation with previous year",
+    y = "Country",
+    title = "Autocorrelation between annual changes in life expectancy and change in previous year",
+    subtitle = "Period: 1955-2014 or nearest available range of years",
+    caption = "Source: HMD"
+       )
+```
+
+This is important for establishing a general principle: Though a 1 lag model does not universally outperform 0 or 2 lag models, it is generally the case that a negative autocorrelation exists between changes in one year and changes in the following year. i.e. it is generally correct to assume that life expectancy changes 'oscillate' rather than are a pure random walk. 
