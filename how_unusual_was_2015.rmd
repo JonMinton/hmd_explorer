@@ -134,7 +134,7 @@ dta_e0 %>%
       arrange(year) %>% 
       mutate(change_e0 = e0 - lag(e0)) %>% 
       filter(year == 2015)
-  )
+  ) 
 ```
 
 
@@ -399,6 +399,54 @@ lag_mdl_summary
 
 
 One conclusion we might draw from this evidence that the data contains negative autocorrelation is that the most troubling aspect of changes in life expectancy in Scotland since 2014 is not necessarily the fall in life expectancy from 2014-15, but the lack of any notable recovery in life expectancy increases from 2015-16. Negative autocorrelation would imply that a year showing a substantial fall in life expectancy is more likely to be followed by a substantial improvement in life expectancy, above the long-term average improvement, the following year. Instead, life expectancy improvement in 2015-16 was close to zero. 
+
+# Breakpoint models 
+
+We've seen earlier how, using data up to 2014, including a lag(1) term leads to a better model fit, as assessed using ANOVA. 
+
+We now want to return to the breakpoint approach used in the previous paper with Lynda and Gerry. This will help get a sense of how much additional value explicitly adding a breakpoint post 2012 adds to the model fit. There's a subsidiary hypothesis: that rates of improvement in the 1990s were atypically high. This can also be assessed formally. 
+
+```{r}
+mdls_brk <- dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(last_change_e0 = lag(change_e0)) %>% 
+  mutate(nineties = between(year, 1990, 1999)) %>% 
+  mutate(brkpoint = year >= 2012) %>% 
+  filter(between(year, 1955, 2017)) %>% 
+  group_by(gender) %>% 
+  nest() %>% 
+  mutate(mdl_nobrk = map(data, ~lm(change_e0 ~ 1, data = .))) %>% 
+  mutate(mdl_brk = map(data, ~lm(change_e0 ~ brkpoint, data = .))) %>%
+  mutate(mdl_nineties_good = map(data, ~lm(change_e0 ~ nineties, data = .))) %>% 
+  mutate(anova_brk = map2(mdl_nobrk, mdl_brk, anova)) %>% 
+  mutate(anova_90s = map2(mdl_nobrk, mdl_nineties_good, anova)) %>% 
+  mutate(p_breakpoint = map_dbl(anova_brk, ~.[2,6])) %>% 
+  mutate(p_nineties_good = map_dbl(anova_90s, ~.[2,6])) %>% 
+  mutate(model_brk_tidy = map(mdl_brk, broom::tidy)) %>% 
+  mutate(model_90s_tidy = map(mdl_nineties_good, broom::tidy))
+
+brk_mdl_summary <- mdls_brk %>% 
+  select(gender, model_brk_tidy) %>% 
+  unnest()
+
+nineties_mdl_summary <- mdls_brk %>% 
+  select(gender, model_90s_tidy) %>% 
+  unnest()
+  
+p_brk_female <- mdls_brk %>% filter(gender == "female") %>% pull("p_breakpoint")
+p_brk_male <- mdls_brk %>% filter(gender == "male") %>% pull("p_breakpoint")
+
+p_90s_female <- mdls_brk %>% filter(gender == "female") %>% pull("p_nineties_good")
+p_90s_male <- mdls_brk %>% filter(gender == "male") %>% pull("p_nineties_good")
+
+
+```
+
+Based on this approach, it seems there's not strong evidence (p ~ 0.35) for a post-2012 breakpoint, though there's even weaker evidence (p ~ 0.75) that the 90s were an 'exceptionally good' period of continual health improvement. This provides a little reassurance that analyses which use 1990 as the start of the time series aren't completely wrong. 
 
 # Appendix: What if all available years were used for Scotland? 
 
@@ -1041,9 +1089,15 @@ dta_e0 %>%
   mutate(lag = substr(lag, 2,2) %>% as.integer) %>% 
   ggplot(aes(x = lag, y = bic, group = gender, colour = gender, shape = gender)) + 
   facet_wrap(~code, scales = "free_y") + 
-  geom_point() + geom_line()
+  geom_point() + geom_line() + 
+  labs(
+    title = "Relationship between number of lag terms in models and BIC for HMD countries",
+    xlab = "Number of lags",
+    y = "BIC",
+    caption = "Source: HMD"
+  )
   
-
+ggsave("figures/best_fit_numlags_intl.png", height = 30, width = 30, units = "cm", dpi = 300)
 ```
 
 
@@ -1084,3 +1138,110 @@ dta_e0 %>%
 ```
 
 This is important for establishing a general principle: Though a 1 lag model does not universally outperform 0 or 2 lag models, it is generally the case that a negative autocorrelation exists between changes in one year and changes in the following year. i.e. it is generally correct to assume that life expectancy changes 'oscillate' rather than are a pure random walk. 
+
+## Appendix: Probability of gains less good in Scotland since 2014
+
+This research shouldn't just focus on 2014-15, but look at how probable that life expectancy increases would have been as bad or worse than seen in 2015-2017 by chance alone. Doing this involves the following steps:
+
+* Take the lag 1 model and run it sequentially 3 times for one trial; do (say) 10000 trials.
+* Take the life expectancy in 2014 and add the result of the three sequential draws to produce simulated life expectancies for 2017. 
+* Work out the proportion of simulated life expectancies in 2017 which are below that observed in 2017. 
+
+```{r, cache = TRUE}
+models <- dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  group_by(code, gender) %>% 
+  arrange(year) %>% 
+  mutate(change_e0 = e0 - lag(e0)) %>% 
+  mutate(lag_1 = lag(change_e0)) %>% 
+  filter(between(year, 1955, 2014)) %>% 
+  group_by(gender) %>% 
+  nest() %>% 
+  mutate(lag_mdl = map(data, ~ lm(change_e0 ~ lag_1, data = .)))
+
+set.seed(100) # for reproducibility
+
+get_coeffs <- function(x){
+  tmp <- arm::sim(x, n.sims = 100)
+  tmp@coef
+}
+
+project_forward <- function(coeffs, dta){ #x: coefficients, y: last year's observation
+  X <- cbind(
+    1, 
+    dta %>% filter(year == 2014) %>% pull(lag_1)
+  )
+
+  make_projection_df <- function(this_beta){ # this is WRONG because it's expected not predicted values! 
+    
+    proj_2015 <- X %*% this_beta %>% as.vector()
+    X1 <- cbind(1, proj_2015)
+    proj_2016 <- X1 %*% this_beta %>% as.vector()
+    X2 <- cbind(1, proj_2016)
+    proj_2017 <- X2 %*% this_beta %>% as.vector()
+    
+  output <- data_frame(
+    year = 2014:2017,
+    change_e0 = c(
+      dta %>% filter(year == 2014) %>% pull(change_e0),
+      proj_2015,
+      proj_2016,
+      proj_2017
+    ),
+    e0 = dta %>% filter(year == 2014) %>% pull(e0)
+  ) %>% 
+  mutate(
+    cl = cumsum(lag(change_e0, default = 0))
+  ) %>% 
+  mutate(e0 = e0 + cl) %>% 
+  select(-cl)
+  }
+  
+  outputs <- apply(coeffs, 1, make_projection_df)
+  
+  return(outputs)  
+}
+
+model_projections <- models %>% 
+  mutate(coeffs = map(lag_mdl, get_coeffs)) %>% 
+  mutate(projections = map2(coeffs, data, project_forward)) 
+
+projection_data <- model_projections %>% 
+  select(gender, projections) %>% 
+  unnest() %>% 
+  group_by(gender) %>% 
+  mutate(sim = row_number())
+
+```
+
+ And now to compare this with the actual data 
+ 
+```{r}
+
+observed_e0 <- dta_e0 %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(gender != "total") %>% 
+  filter(between(year, 2014, 2017)) %>% 
+  select(year, gender, observed = e0)
+
+projection_data %>% 
+  unnest() %>% 
+  left_join(observed_e0) %>% 
+  rename(projected_e0 = e0) %>% 
+  filter(sim <= 1000) %>% 
+  ggplot(aes(x = year, group = sim, y = projected_e0)) + 
+  geom_line(alpha = 0.1) + 
+  facet_grid(gender ~ . , scales = "free_y") +
+  geom_line(aes(x = year, y = observed), 
+            size = 1.4, colour = "red",
+            inherit.aes = F, 
+            data = observed_e0
+              )
+
+```
+
+
+This needs to be redone with predicted rather than expected values. 
+
+However I've spent enough time on this today so will stop. 
