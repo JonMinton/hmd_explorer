@@ -1,7 +1,8 @@
 rm(list = ls())
 
 pacman::p_load(
-  tidyverse
+  tidyverse,
+  plotly
 )
 
 
@@ -72,4 +73,24 @@ data_tidied %>%
 
 
 
+data_tidied %>% 
+  filter(cancersite == 'All cancer types') %>% 
+  filter(sex == 'All') %>% 
+  select(year, age, rate) %>% 
+  spread(age, rate) -> tmp
+
+yearvec <- as.character(tmp$year)
+tmp$year <- NULL 
+agevec <- names(tmp)
+
+val_mtrx <- as.matrix(tmp)
+
+dim(val_mtrx)
+
+
+plot_ly(
+  z = val_mtrx,
+  x = agevec, y = yearvec  ,
+  type = 'heatmap'
+        )
 
