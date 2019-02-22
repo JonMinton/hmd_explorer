@@ -953,7 +953,7 @@ This dataset will show the change in e0 since 1955 for each country in the HMD.
 Each column will be a different gender/country combination
 
 
-```{r}
+```{r, eval = FALSE}
 tbl <- dta_e0 %>% 
   filter(gender != "total") %>% 
   group_by(code, gender) %>% 
