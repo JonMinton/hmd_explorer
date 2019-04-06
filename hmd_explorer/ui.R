@@ -156,7 +156,8 @@ shinyUI(fluidPage(
                            plotlyOutput("mort_ratio_surface")
                   ),
                   tabPanel(title = "Population Sex Ratios",
-                           plotlyOutput("pop_ratio_surface")
+                           plotlyOutput("pop_ratio_surface"),
+                           plotlyOutput("pop_ratio_subplot")
                   ),
                   tabPanel(
                     title = "Mortality Group Comparisons",

@@ -856,7 +856,10 @@ shinyServer(function(input, output) {
     ) %>%
       matrix(length(yy), length(xx))
     
-    p <- plot_ly(showscale = FALSE) %>%
+    p <- plot_ly(
+      showscale = FALSE,
+      source = "pop_ratio_surface"
+                 ) %>%
       add_surface(
         name = "Male:Female\nPopulation Ratio",
         x = ~ xx,
@@ -899,6 +902,123 @@ shinyServer(function(input, output) {
         )
       )
     
+    return(p)
+  })
+  
+  output$pop_ratio_subplot <- renderPlotly({
+    s <- event_data("plotly_click", source = "pop_ratio_surface")
+    if (length(s) == 0) {
+      return(NULL)
+    } else {
+      this_age <- s$x
+      this_year <- s$y
+      this_cohort = this_year - this_age
+
+      p1 <- full_data %>%
+        filter(age <= 100) %>%
+        filter(code == input$code_select) %>%
+        filter(age == this_age) %>%
+        select(age, num_population, year, gender) %>% 
+        spread(gender, num_population) %>% 
+        mutate(
+          ratio = Male / Female,
+          difference = (Male - Female) / Female
+          ) %>% 
+        plot_ly(x = ~ year, y = ~ difference) %>%
+        add_lines(
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Year: ",
+            year,
+            '\nDifference: ',
+            1000 * round(difference, 3),
+            ifelse(difference < 0, " fewer ", " more "),
+            "males / thousand females.",
+            '\nRatio: ',
+            round(ratio, 2), " M:F. ", 
+            round(1/ratio, 2), " F:M"
+          )
+        )
+
+      
+      p2 <- full_data %>%
+        filter(age <= 100) %>%
+        filter(code == input$code_select) %>%
+        filter(year == this_year) %>%
+        select(age, num_population, year, gender) %>% 
+        spread(gender, num_population) %>% 
+        mutate(
+          ratio = Male / Female,
+          difference = (Male - Female) / Female
+        ) %>% 
+        plot_ly(x = ~ age, y = ~ difference) %>%
+        add_lines(
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Age: ",
+            age,
+            '\nDifference: ',
+            1000 * round(difference, 3),
+            ifelse(difference < 0, " fewer ", " more "),
+            "males / thousand females.",
+            '\nRatio: ',
+            round(ratio, 2), " M:F. ", 
+            round(1/ratio, 2), " F:M"
+          )
+        )
+      
+      p3 <- full_data %>%
+        filter(age <= 100) %>%
+        filter(code == input$code_select) %>%
+        mutate(birth_cohort = year - age) %>%
+        filter(birth_cohort == this_cohort) %>%
+        select(age, num_population, birth_cohort, gender) %>% 
+        spread(gender, num_population) %>% 
+        mutate(
+          ratio = Male / Female,
+          difference = (Male - Female) / Female
+        ) %>% 
+        plot_ly(x = ~ age, y = ~ difference) %>%
+        add_lines(
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Cohort: ",
+            birth_cohort,
+            '\nDifference: ',
+            1000 * round(difference, 3),
+            ifelse(difference < 0, " fewer ", " more "),
+            "males / thousand females.",
+            '\nRatio: ',
+            round(ratio, 2), " M:F. ", 
+            round(1/ratio, 2), " F:M"
+          )
+        )
+      
+      this_country_name <-
+        names(codes_named[codes_named == input$code_select])
+      
+      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+        layout(
+          yaxis = list(
+            title = "Sex population difference"
+          ),
+          xaxis = list(title = "year"),
+          xaxis2 = list(title = "age", range = c(0, 100)),
+          xaxis3 = list(
+            title = paste0("age for ", this_cohort, " birth cohort"),
+            range = c(0, 100)
+          ),
+          title = paste0(
+            "Population gender ratios for ",
+            this_country_name,
+            " in year ",
+            this_year,
+            " and age ",
+            this_age
+          ),
+          showlegend = FALSE
+        )
+    }
     return(p)
   })
   
