@@ -931,7 +931,7 @@ shinyServer(function(input, output) {
             "Year: ",
             year,
             '\nDifference: ',
-            1000 * round(difference, 3),
+            abs(1000 * round(difference, 3)),
             ifelse(difference < 0, " fewer ", " more "),
             "males / thousand females.",
             '\nRatio: ',
