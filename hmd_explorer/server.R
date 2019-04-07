@@ -86,44 +86,49 @@ make_z_list <- function(X,
 
 
 
+get_selected_data <- function(full_data, input){
+  
+  tmp <- full_data %>%
+    filter(gender == input$gender_select) %>%
+    mutate(
+      pop_group = case_when(
+        code %in% input$multi_code_select_B ~ "B",
+        code %in% input$multi_code_select_A ~ "A",
+        TRUE ~ NA_character_
+      )
+    ) %>%
+    filter(!is.na(pop_group))
+  
+  if (input$limit_age) {
+    tmp <- tmp %>%
+      filter(age >= input$age_limits[1], age <= input$age_limits[2])
+  }
+  
+  if (input$limit_period) {
+    tmp <- tmp %>%
+      filter(year >= input$period_limits[1],
+             year <= input$period_limits[2])
+  }
+  
+  tmp <- tmp %>%
+    group_by(pop_group, year, age) %>%
+    summarise(
+      exposure = sum(exposure, na.rm = T),
+      num_deaths = sum(num_deaths, na.rm = T)
+    ) %>%
+    ungroup() %>%
+    mutate(lmr = log((num_deaths + input$small_n_correction) / (exposure + input$small_n_correction),
+                     10
+    ))
+  
+  return(tmp)
+  
+}
+
 shinyServer(function(input, output) {
   newdata <- eventReactive(input$recalc,
-                           {
-                             tmp <- full_data %>%
-                               filter(gender == input$gender_select) %>%
-                               mutate(
-                                 pop_group = case_when(
-                                   code %in% input$multi_code_select_B ~ "B",
-                                   code %in% input$multi_code_select_A ~ "A",
-                                   TRUE ~ NA_character_
-                                 )
-                               ) %>%
-                               filter(!is.na(pop_group))
-                             
-                             if (input$limit_age) {
-                               tmp <- tmp %>%
-                                 filter(age >= input$age_limits[1], age <= input$age_limits[2])
-                             }
-                             
-                             if (input$limit_period) {
-                               tmp <- tmp %>%
-                                 filter(year >= input$period_limits[1],
-                                        year <= input$period_limits[2])
-                             }
-                             
-                             tmp <- tmp %>%
-                               group_by(pop_group, year, age) %>%
-                               summarise(
-                                 exposure = sum(exposure, na.rm = T),
-                                 num_deaths = sum(num_deaths, na.rm = T)
-                               ) %>%
-                               ungroup() %>%
-                               mutate(lmr = log((num_deaths + input$small_n_correction) / (exposure + input$small_n_correction),
-                                                10
-                               ))
-                             
-                             return(tmp)
-                           })
+                           {get_selected_data(full_data = full_data, input = input)
+            })
   
   output$mort_surface <- renderPlotly({
     dta_ss <- full_data %>%
