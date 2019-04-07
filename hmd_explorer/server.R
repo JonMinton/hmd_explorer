@@ -789,6 +789,245 @@ return_mortratio_surface <- function(full_data, input){
   return(p)
 }
 
+
+return_popratio_surface <- function(full_data, input){
+  ratio_limit <- as.double(input$ratio_limiter)
+  this_code <- input$code_select
+  n_correction <- input$small_n_correction
+  
+  
+  dta_ss <- full_data %>%
+    filter(code == this_code) %>%
+    filter(gender != "Total")
+  
+  
+  if (input$limit_age) {
+    dta_ss <- dta_ss %>%
+      filter(age >= input$age_limits[1], age <= input$age_limits[2])
+  }
+  
+  if (input$limit_period) {
+    dta_ss <- dta_ss %>%
+      filter(year >= input$period_limits[1],
+             year <= input$period_limits[2])
+  }
+  
+  z_list <- dta_ss %>%
+    mutate(N = (num_population + n_correction)) %>%
+    select(age, year, gender, N) %>%
+    spread(gender, N) %>%
+    mutate(
+      ratio = Male / Female,
+      excess = (Male - Female) / Female,
+      ratio = case_when(
+        ratio < -ratio_limit ~ -ratio_limit,
+        ratio > ratio_limit  ~ ratio_limit,
+        TRUE ~ ratio
+      )
+    ) %>%
+    nest() %>%
+    mutate(
+      ratio_list = map(data, make_z_list_pop, what = "ratio"),
+      excess_list = map(data, make_z_list_pop, what = "excess")
+    )
+  
+  
+  xx <- z_list[["ratio_list"]][[1]][["age"]]
+  yy <- z_list[["ratio_list"]][[1]][["year"]]
+  zz <- z_list[["ratio_list"]][[1]][["vals"]]
+  zz_e <- z_list[["excess_list"]][[1]][["vals"]]
+  
+  
+  n_ages <- length(xx)
+  n_years <- length(yy)
+  
+  custom_text <- paste0(
+    "In ",
+    rep(yy, times = length(xx)),
+    ", at age ",
+    rep(xx, each = length(yy)),
+    ", there were \n",
+    ifelse(
+      zz > 1,
+      paste0(round(zz, 2), " males per female"),
+      paste0(round(1 / zz, 2), " females per male")
+    ),
+    "\n(",
+    ifelse(
+      zz_e > 0,
+      paste0(round(zz_e * 1000, 0), " more males/1000 females"),
+      paste0(-round(zz_e * 1000, 0), " more females/1000 males")
+    ),
+    ")"
+  ) %>%
+    matrix(length(yy), length(xx))
+  
+  p <- plot_ly(
+    showscale = FALSE,
+    source = "pop_ratio_surface"
+  ) %>%
+    add_surface(
+      name = "Male:Female\nPopulation Ratio",
+      x = ~ xx,
+      y = ~ yy,
+      z = ~ zz,
+      surfacecolor = ~ log(zz),
+      colorscale = list(
+        seq(
+          from = -ratio_limit,
+          to = ratio_limit,
+          length.out = 10
+        ),
+        colorRampPalette(RColorBrewer::brewer.pal(5, "RdBu"))(10)
+      ),
+      hoverinfo = "text",
+      text = custom_text,
+      cmin = -ratio_limit,
+      cmax = ratio_limit,
+      cauto = F
+    ) %>%
+    add_surface(
+      name = "equal ratio",
+      x = ~ c(min(xx), max(xx)),
+      y = ~ c(min(yy), max(yy)),
+      z = ~ matrix(rep(1, 4), nrow = 2),
+      opacity = 0.5
+    ) %>%
+    layout(
+      scene = list(
+        zaxis = list(title = "Ratio",
+                     type = "log"),
+        xaxis = list(title = "age in years"),
+        yaxis = list(title = "year"),
+        aspectratio = list(
+          x = n_ages / n_years,
+          y = 1,
+          z = 0.5
+        ),
+        showlegend = FALSE
+      )
+    )
+  
+  return(p)
+}
+
+return_popratio_subplot <- function(full_data, input){
+  s <- event_data("plotly_click", source = "pop_ratio_surface")
+  if (length(s) == 0) {
+    return(NULL)
+  } else {
+    this_age <- s$x
+    this_year <- s$y
+    this_cohort = this_year - this_age
+    
+    p1 <- full_data %>%
+      filter(age <= 100) %>%
+      filter(code == input$code_select) %>%
+      filter(age == this_age) %>%
+      select(age, num_population, year, gender) %>% 
+      spread(gender, num_population) %>% 
+      mutate(
+        ratio = Male / Female,
+        difference = (Male - Female) / Female
+      ) %>% 
+      plot_ly(x = ~ year, y = ~ difference) %>%
+      add_lines(
+        hoverinfo = 'text',
+        text = ~ paste0(
+          "Year: ",
+          year,
+          '\nDifference: ',
+          abs(1000 * round(difference, 3)),
+          ifelse(difference < 0, " fewer ", " more "),
+          "males / thousand females.",
+          '\nRatio: ',
+          round(ratio, 2), " M:F. ", 
+          round(1/ratio, 2), " F:M"
+        )
+      )
+    
+    
+    p2 <- full_data %>%
+      filter(age <= 100) %>%
+      filter(code == input$code_select) %>%
+      filter(year == this_year) %>%
+      select(age, num_population, year, gender) %>% 
+      spread(gender, num_population) %>% 
+      mutate(
+        ratio = Male / Female,
+        difference = (Male - Female) / Female
+      ) %>% 
+      plot_ly(x = ~ age, y = ~ difference) %>%
+      add_lines(
+        hoverinfo = 'text',
+        text = ~ paste0(
+          "Age: ",
+          age,
+          '\nDifference: ',
+          abs(1000 * round(difference, 3)),
+          ifelse(difference < 0, " fewer ", " more "),
+          "males / thousand females.",
+          '\nRatio: ',
+          round(ratio, 2), " M:F. ", 
+          round(1/ratio, 2), " F:M"
+        )
+      )
+    
+    p3 <- full_data %>%
+      filter(age <= 100) %>%
+      filter(code == input$code_select) %>%
+      mutate(birth_cohort = year - age) %>%
+      filter(birth_cohort == this_cohort) %>%
+      select(age, num_population, birth_cohort, gender) %>% 
+      spread(gender, num_population) %>% 
+      mutate(
+        ratio = Male / Female,
+        difference = (Male - Female) / Female
+      ) %>% 
+      plot_ly(x = ~ age, y = ~ difference) %>%
+      add_lines(
+        hoverinfo = 'text',
+        text = ~ paste0(
+          "Cohort: ",
+          birth_cohort,
+          '\nDifference: ',
+          abs(1000 * round(difference, 3)),
+          ifelse(difference < 0, " fewer ", " more "),
+          "males / thousand females.",
+          '\nRatio: ',
+          round(ratio, 2), " M:F. ", 
+          round(1/ratio, 2), " F:M"
+        )
+      )
+    
+    this_country_name <-
+      names(codes_named[codes_named == input$code_select])
+    
+    p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+      layout(
+        yaxis = list(
+          title = "Sex population difference"
+        ),
+        xaxis = list(title = "year"),
+        xaxis2 = list(title = "age", range = c(0, 100)),
+        xaxis3 = list(
+          title = paste0("age for ", this_cohort, " birth cohort"),
+          range = c(0, 100)
+        ),
+        title = paste0(
+          "Population gender ratios for ",
+          this_country_name,
+          " in year ",
+          this_year,
+          " and age ",
+          this_age
+        ),
+        showlegend = FALSE
+      )
+  }
+  return(p)
+}
+
 shinyServer(function(input, output) {
   newdata <- eventReactive(input$recalc,
                            {get_selected_data(full_data = full_data, input = input)
@@ -804,243 +1043,8 @@ shinyServer(function(input, output) {
   output$mort_ratio_surface <- renderPlotly({return_mortratio_surface(full_data = full_data, input = input) })
   # to do: mort_ratio_subplot
   
-  output$pop_ratio_surface <- renderPlotly({
-    ratio_limit <- as.double(input$ratio_limiter)
-    this_code <- input$code_select
-    n_correction <- input$small_n_correction
-    
-    
-    dta_ss <- full_data %>%
-      filter(code == this_code) %>%
-      filter(gender != "Total")
-    
-    
-    if (input$limit_age) {
-      dta_ss <- dta_ss %>%
-        filter(age >= input$age_limits[1], age <= input$age_limits[2])
-    }
-    
-    if (input$limit_period) {
-      dta_ss <- dta_ss %>%
-        filter(year >= input$period_limits[1],
-               year <= input$period_limits[2])
-    }
-    
-    z_list <- dta_ss %>%
-      mutate(N = (num_population + n_correction)) %>%
-      select(age, year, gender, N) %>%
-      spread(gender, N) %>%
-      mutate(
-        ratio = Male / Female,
-        excess = (Male - Female) / Female,
-        ratio = case_when(
-          ratio < -ratio_limit ~ -ratio_limit,
-          ratio > ratio_limit  ~ ratio_limit,
-          TRUE ~ ratio
-        )
-      ) %>%
-      nest() %>%
-      mutate(
-        ratio_list = map(data, make_z_list_pop, what = "ratio"),
-        excess_list = map(data, make_z_list_pop, what = "excess")
-      )
-    
-    
-    xx <- z_list[["ratio_list"]][[1]][["age"]]
-    yy <- z_list[["ratio_list"]][[1]][["year"]]
-    zz <- z_list[["ratio_list"]][[1]][["vals"]]
-    zz_e <- z_list[["excess_list"]][[1]][["vals"]]
-    
-    
-    n_ages <- length(xx)
-    n_years <- length(yy)
-    
-    custom_text <- paste0(
-      "In ",
-      rep(yy, times = length(xx)),
-      ", at age ",
-      rep(xx, each = length(yy)),
-      ", there were \n",
-      ifelse(
-        zz > 1,
-        paste0(round(zz, 2), " males per female"),
-        paste0(round(1 / zz, 2), " females per male")
-      ),
-      "\n(",
-      ifelse(
-        zz_e > 0,
-        paste0(round(zz_e * 1000, 0), " more males/1000 females"),
-        paste0(-round(zz_e * 1000, 0), " more females/1000 males")
-      ),
-      ")"
-    ) %>%
-      matrix(length(yy), length(xx))
-    
-    p <- plot_ly(
-      showscale = FALSE,
-      source = "pop_ratio_surface"
-                 ) %>%
-      add_surface(
-        name = "Male:Female\nPopulation Ratio",
-        x = ~ xx,
-        y = ~ yy,
-        z = ~ zz,
-        surfacecolor = ~ log(zz),
-        colorscale = list(
-          seq(
-            from = -ratio_limit,
-            to = ratio_limit,
-            length.out = 10
-          ),
-          colorRampPalette(RColorBrewer::brewer.pal(5, "RdBu"))(10)
-        ),
-        hoverinfo = "text",
-        text = custom_text,
-        cmin = -ratio_limit,
-        cmax = ratio_limit,
-        cauto = F
-      ) %>%
-      add_surface(
-        name = "equal ratio",
-        x = ~ c(min(xx), max(xx)),
-        y = ~ c(min(yy), max(yy)),
-        z = ~ matrix(rep(1, 4), nrow = 2),
-        opacity = 0.5
-      ) %>%
-      layout(
-        scene = list(
-          zaxis = list(title = "Ratio",
-                       type = "log"),
-          xaxis = list(title = "age in years"),
-          yaxis = list(title = "year"),
-          aspectratio = list(
-            x = n_ages / n_years,
-            y = 1,
-            z = 0.5
-          ),
-          showlegend = FALSE
-        )
-      )
-    
-    return(p)
-  })
-  
-  output$pop_ratio_subplot <- renderPlotly({
-    s <- event_data("plotly_click", source = "pop_ratio_surface")
-    if (length(s) == 0) {
-      return(NULL)
-    } else {
-      this_age <- s$x
-      this_year <- s$y
-      this_cohort = this_year - this_age
-
-      p1 <- full_data %>%
-        filter(age <= 100) %>%
-        filter(code == input$code_select) %>%
-        filter(age == this_age) %>%
-        select(age, num_population, year, gender) %>% 
-        spread(gender, num_population) %>% 
-        mutate(
-          ratio = Male / Female,
-          difference = (Male - Female) / Female
-          ) %>% 
-        plot_ly(x = ~ year, y = ~ difference) %>%
-        add_lines(
-          hoverinfo = 'text',
-          text = ~ paste0(
-            "Year: ",
-            year,
-            '\nDifference: ',
-            abs(1000 * round(difference, 3)),
-            ifelse(difference < 0, " fewer ", " more "),
-            "males / thousand females.",
-            '\nRatio: ',
-            round(ratio, 2), " M:F. ", 
-            round(1/ratio, 2), " F:M"
-          )
-        )
-
-      
-      p2 <- full_data %>%
-        filter(age <= 100) %>%
-        filter(code == input$code_select) %>%
-        filter(year == this_year) %>%
-        select(age, num_population, year, gender) %>% 
-        spread(gender, num_population) %>% 
-        mutate(
-          ratio = Male / Female,
-          difference = (Male - Female) / Female
-        ) %>% 
-        plot_ly(x = ~ age, y = ~ difference) %>%
-        add_lines(
-          hoverinfo = 'text',
-          text = ~ paste0(
-            "Age: ",
-            age,
-            '\nDifference: ',
-            abs(1000 * round(difference, 3)),
-            ifelse(difference < 0, " fewer ", " more "),
-            "males / thousand females.",
-            '\nRatio: ',
-            round(ratio, 2), " M:F. ", 
-            round(1/ratio, 2), " F:M"
-          )
-        )
-      
-      p3 <- full_data %>%
-        filter(age <= 100) %>%
-        filter(code == input$code_select) %>%
-        mutate(birth_cohort = year - age) %>%
-        filter(birth_cohort == this_cohort) %>%
-        select(age, num_population, birth_cohort, gender) %>% 
-        spread(gender, num_population) %>% 
-        mutate(
-          ratio = Male / Female,
-          difference = (Male - Female) / Female
-        ) %>% 
-        plot_ly(x = ~ age, y = ~ difference) %>%
-        add_lines(
-          hoverinfo = 'text',
-          text = ~ paste0(
-            "Cohort: ",
-            birth_cohort,
-            '\nDifference: ',
-            abs(1000 * round(difference, 3)),
-            ifelse(difference < 0, " fewer ", " more "),
-            "males / thousand females.",
-            '\nRatio: ',
-            round(ratio, 2), " M:F. ", 
-            round(1/ratio, 2), " F:M"
-          )
-        )
-      
-      this_country_name <-
-        names(codes_named[codes_named == input$code_select])
-      
-      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
-        layout(
-          yaxis = list(
-            title = "Sex population difference"
-          ),
-          xaxis = list(title = "year"),
-          xaxis2 = list(title = "age", range = c(0, 100)),
-          xaxis3 = list(
-            title = paste0("age for ", this_cohort, " birth cohort"),
-            range = c(0, 100)
-          ),
-          title = paste0(
-            "Population gender ratios for ",
-            this_country_name,
-            " in year ",
-            this_year,
-            " and age ",
-            this_age
-          ),
-          showlegend = FALSE
-        )
-    }
-    return(p)
-  })
+  output$pop_ratio_surface <- renderPlotly({return_popratio_surface(full_data = full_data, input = input)   })
+  output$pop_ratio_subplot <- renderPlotly({return_popratio_subplot(full_data = full_data, input = input)   })
   
   output$mort_group_surface <- renderPlotly({
     diffs <- newdata() %>%
