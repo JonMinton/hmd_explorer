@@ -1028,6 +1028,569 @@ return_popratio_subplot <- function(full_data, input){
   return(p)
 }
 
+return_mortgroup_surface <- function(newdata, input){
+  diffs <- newdata() %>%
+    select(pop_group, year, age, lmr) %>%
+    spread(pop_group, lmr) %>%
+    mutate(diff_lmr = B - A)
+  
+  
+  if (input$group_mode == 'diff') {
+    z_list <- make_z_list_pop(diffs, what = "diff_lmr")
+    
+    range_limits <- eventReactive(input$recalc,
+                                  {
+                                    if (input$limit_diffz) {
+                                      range_limits <- as.double(input$diffz_limits)
+                                    } else {
+                                      maxabs <- max(abs(zz[is.finite(zz)]))
+                                      range_limits <- c(-maxabs, maxabs)
+                                    }
+                                    return(range_limits)
+                                  })
+    
+    
+    xx <- z_list[["age"]]
+    yy <- z_list[["year"]]
+    zz <- z_list[["vals"]]
+    
+    n_ages <- length(xx)
+    n_years <- length(yy)
+    
+    range_limits <- range_limits()
+    maxabs <- max(abs(range_limits))
+    
+    yearvec <- rep(yy, times = length(xx))
+    agevec <- rep(xx, each = length(yy))
+    cohortvec <- yearvec - agevec
+    
+    rr <- 10 ^ zz # mortality ratio
+    
+    
+    custom_text <- paste0(
+      "In ",
+      yearvec,
+      ", at age ",
+      agevec,
+      " (",
+      cohortvec,
+      " birth cohort)\n",
+      "Diff in log mortality: ",
+      paste0(round(zz, 2)),
+      "\nRatio: ",
+      paste0(round(rr, 2)),
+      " (",
+      paste0(round(1 / rr, 2)),
+      ")"
+    ) %>%
+      matrix(length(yy), length(xx))
+    
+    p <- plot_ly(showscale = FALSE,
+                 source = "mort_group_surface") %>%
+      add_surface(
+        name = "Diff in LMR",
+        x = ~ xx,
+        y = ~ yy,
+        z = ~ zz,
+        surfacecolor = ~ zz,
+        colorscale = list(
+          seq(
+            from = -maxabs,
+            to = maxabs,
+            length.out = 10
+          ),
+          colorRampPalette(RColorBrewer::brewer.pal(5, "RdBu"))(10)
+        ),
+        hoverinfo = "text",
+        text = custom_text,
+        cmin = range_limits[1],
+        cmax = range_limits[2],
+        cauto = F
+      ) %>%
+      add_surface(
+        name = "equal ratio",
+        x = ~ c(min(xx), max(xx)),
+        y = ~ c(min(yy), max(yy)),
+        z = ~ matrix(rep(0, 4), nrow = 2),
+        opacity = 0.5
+      ) %>%
+      layout(
+        scene = list(
+          zaxis = list(title = "Diff in log mortality"),
+          xaxis = list(title = "age in years"),
+          yaxis = list(title = "year"),
+          aspectratio = list(
+            x = n_ages / n_years,
+            y = 1,
+            z = 0.5
+          ),
+          showlegend = FALSE
+        )
+      )
+    
+  } else if (input$group_mode == 'both') {
+    z_list <- make_z_list_pop(diffs, what = "diff_lmr")
+    z_list_A <- make_z_list_pop(diffs, what = "A")
+    z_list_B <- make_z_list_pop(diffs, what = "B")
+    
+    
+    range_limits <- eventReactive(input$recalc,
+                                  {
+                                    if (input$limit_diffz) {
+                                      range_limits <- as.double(input$diffz_limits)
+                                    } else {
+                                      maxabs <- max(abs(zz[is.finite(zz)]))
+                                      range_limits <-
+                                        c(-maxabs, maxabs)
+                                    }
+                                    return(range_limits)
+                                  })
+    
+    
+    xx <- z_list[["age"]]
+    yy <- z_list[["year"]]
+    zz <- z_list[["vals"]]
+    zz_a <- z_list_A[["vals"]]
+    zz_b <- z_list_B[["vals"]]
+    
+    n_ages <- length(xx)
+    n_years <- length(yy)
+    
+    range_limits <- range_limits()
+    maxabs <- max(abs(range_limits))
+    
+    yearvec <- rep(yy, times = length(xx))
+    agevec <- rep(xx, each = length(yy))
+    cohortvec <- yearvec - agevec
+    
+    rr <- 10 ^ zz # mortality ratio
+    
+    
+    custom_text <- paste0(
+      "In ",
+      yearvec,
+      ", at age ",
+      agevec,
+      " (",
+      cohortvec,
+      " birth cohort)\n",
+      "Diff in log mortality: ",
+      paste0(round(zz, 2)),
+      "\nRatio: ",
+      paste0(round(rr, 2)),
+      " (",
+      paste0(round(1 / rr, 2)),
+      ")",
+      "\nTop: ",
+      paste0(round(zz_b, 2)),
+      "\tBottom: ",
+      paste0(round(zz_a, 2))
+    ) %>%
+      matrix(length(yy), length(xx))
+    
+    new_alpha_A <- eventReactive(input$recalc,
+                                 input$group_A_alpha)
+    
+    new_alpha_B <- eventReactive(input$recalc,
+                                 input$group_B_alpha)
+    
+    p <- plot_ly(showscale = FALSE,
+                 source = "mort_group_surface") %>%
+      add_surface(
+        name = "LMR in A",
+        x = ~ xx,
+        y = ~ yy,
+        z = ~ zz_a,
+        colorscale = list(c(0, 1),
+                          c('red' , 'red')),
+        opacity = new_alpha_A(),
+        hoverinfo = "text",
+        text = custom_text,
+        cmin = range_limits[1],
+        cmax = range_limits[2],
+        cauto = F
+      ) %>%
+      add_surface(
+        name = "LMR in B",
+        x = ~ xx,
+        y = ~ yy,
+        z = ~ zz_b,
+        opacity = new_alpha_B(),
+        colorscale = list(c(0, 1),
+                          c('blue' , 'blue')),
+        hoverinfo = "text",
+        text = custom_text,
+        cmin = range_limits[1],
+        cmax = range_limits[2],
+        cauto = F
+      ) %>%
+      layout(
+        scene = list(
+          zaxis = list(title = "log mortality"),
+          xaxis = list(title = "age in years"),
+          yaxis = list(title = "year"),
+          aspectratio = list(
+            x = n_ages / n_years,
+            y = 1,
+            z = 0.5
+          ),
+          showlegend = FALSE
+        )
+      )
+    
+    
+  }
+  return(p)
+}
+
+return_mortgroup_subplot <- function(newdata, input){
+  if (input$group_mode == 'diff') {
+    # cat(file=stderr(), "the value of recalc is ", input$recalc,"\n")
+    s <- event_data("plotly_click", source = "mort_group_surface")
+    # cat(file=stderr(), "s ", ifelse(is.null(s), "is", "is not"), "NULL\n")
+    
+    if (is.null(s)) {
+      return(NULL)
+    } else {
+      diffs <- newdata() %>%
+        select(pop_group, year, age, lmr) %>%
+        spread(pop_group, lmr) %>%
+        mutate(diff_lmr = B - A)
+      
+      this_age <- s$x[1]
+      this_year <- s$y[1]
+      this_cohort <- this_year - this_age
+      
+      absmax <- max(abs(diffs$diff_lmr), na.rm = T)
+      
+      p1 <- diffs %>%
+        filter(age == this_age) %>%
+        plot_ly(x = ~ year, y = ~ diff_lmr) %>%
+        add_lines(
+          showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Year: ",
+            year,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
+            )
+          )
+        )
+      
+      p2 <- diffs %>%
+        filter(year == this_year) %>%
+        plot_ly(x = ~ age, y = ~ diff_lmr) %>%
+        add_lines(
+          showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Age: ",
+            age,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
+            )
+          )
+        )
+      
+      p3 <- diffs %>%
+        mutate(birth_cohort = year - age) %>%
+        filter(birth_cohort == this_cohort) %>%
+        plot_ly(x = ~ age, y = ~ diff_lmr) %>%
+        add_lines(
+          showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Age: ",
+            age,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
+            )
+          )
+        )
+      
+      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+        layout(
+          yaxis = list(title = "Difference in log mortalities",
+                       range = c(-absmax, absmax)),
+          xaxis = list(title = paste0(
+            "Difference by year at age ", this_age
+          )),
+          xaxis2 = list(
+            title = paste0("Difference by age in year ", this_year),
+            range = c(0, 100)
+          ),
+          xaxis3 = list(
+            title = paste0("Difference by age for ", this_cohort, " birth cohort"),
+            range = c(0, 100)
+          ),
+          title = paste0(
+            "Differences in log mortality between population groups in year ",
+            this_year,
+            " and age ",
+            this_age
+          ),
+          showlegend = FALSE
+        )
+    }
+  } else if (input$group_mode == 'both') {
+    # cat(file=stderr(), "the value of recalc is ", input$recalc,"\n")
+    s <- event_data("plotly_click", source = "mort_group_surface")
+    # cat(file=stderr(), "s ", ifelse(is.null(s), "is", "is not"), "NULL\n")
+    
+    if (is.null(s)) {
+      return(NULL)
+    } else {
+      diffs <- newdata() %>%
+        select(pop_group, year, age, lmr) %>%
+        spread(pop_group, lmr) %>%
+        mutate(diff_lmr = B - A)
+      
+      this_age <- s$x[1]
+      this_year <- s$y[1]
+      this_cohort <- this_year - this_age
+      
+      absmax <- max(abs(c(diffs$A, diffs$B)), na.rm = T)
+      
+      p1 <- diffs %>%
+        filter(age == this_age) %>%
+        plot_ly(x = ~ year) %>%
+        add_lines(
+          y = ~ B,
+          line = list(color = 'blue'),
+          showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Year: ",
+            year,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
+            )
+          )
+        ) %>%
+        add_lines(
+          y = ~ A,
+          line = list(color = 'red'),
+          showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Year: ",
+            year,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " fewer deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " more deaths")
+            )
+          )
+        )
+      
+      p2 <- diffs %>%
+        filter(year == this_year) %>%
+        plot_ly(x = ~ age) %>%
+        add_lines(
+          y = ~ B,
+          showlegend = FALSE,
+          line = list(color = 'blue'),
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Age: ",
+            age,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
+            )
+          )
+        ) %>%
+        add_lines(
+          y = ~ A,
+          showlegend = FALSE,
+          line = list(color = 'red'),
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Age: ",
+            age,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " fewer deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " more deaths")
+            )
+          )
+          
+        )
+      
+      p3 <- diffs %>%
+        mutate(birth_cohort = year - age) %>%
+        filter(birth_cohort == this_cohort) %>%
+        plot_ly(x = ~ age) %>%
+        add_lines(
+          y = ~ B,
+          line = list(color = 'blue'),
+          showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Age: ",
+            age,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
+            )
+          )
+        ) %>%
+        add_lines(
+          y = ~ A,
+          line = list(color = 'red'),
+          showlegend = FALSE,
+          hoverinfo = 'text',
+          text = ~ paste0(
+            "Age: ",
+            age,
+            '\nLog mortalities: ',
+            round(B, 3),
+            ' - ',
+            round(A, 3),
+            ' = ',
+            round(diff_lmr, 3),
+            '\nDeaths per 10,000: ',
+            round(10000 * 10 ^ B, 0),
+            ' - ',
+            round(10000 * 10 ^ A, 0),
+            "\nso ",
+            ifelse(
+              B > A,
+              paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " fewer deaths"),
+              paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " more deaths")
+            )
+          )
+        )
+      
+      
+      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+        layout(
+          yaxis = list(title = "Log mortality rate",
+                       range = c(-absmax, 0)),
+          xaxis = list(title = paste0(
+            "Log mortality year at age ", this_age
+          )),
+          xaxis2 = list(
+            title = paste0("Log mortality by age in year ", this_year),
+            range = c(0, 100)
+          ),
+          xaxis3 = list(
+            title = paste0("Log mortality by age for ", this_cohort, " birth cohort"),
+            range = c(0, 100)
+          ),
+          title = paste0(
+            "Log mortality rates for population groups in year ",
+            this_year,
+            " and age ",
+            this_age
+          ),
+          showlegend = FALSE
+        )
+    }
+  }
+  return(p)
+  
+}
+
 shinyServer(function(input, output) {
   newdata <- eventReactive(input$recalc,
                            {get_selected_data(full_data = full_data, input = input)
@@ -1039,579 +1602,14 @@ shinyServer(function(input, output) {
   output$pop_surface <- renderPlotly({return_pop_surface(full_data = full_data, input = input)    })
   output$pop_subplot <- renderPlotly({return_pop_subplot(full_data = full_data, input = input)    })
   
-  
   output$mort_ratio_surface <- renderPlotly({return_mortratio_surface(full_data = full_data, input = input) })
   # to do: mort_ratio_subplot
   
   output$pop_ratio_surface <- renderPlotly({return_popratio_surface(full_data = full_data, input = input)   })
   output$pop_ratio_subplot <- renderPlotly({return_popratio_subplot(full_data = full_data, input = input)   })
   
-  output$mort_group_surface <- renderPlotly({
-    diffs <- newdata() %>%
-      select(pop_group, year, age, lmr) %>%
-      spread(pop_group, lmr) %>%
-      mutate(diff_lmr = B - A)
-    
-    
-    if (input$group_mode == 'diff') {
-      z_list <- make_z_list_pop(diffs, what = "diff_lmr")
-      
-      range_limits <- eventReactive(input$recalc,
-                                    {
-                                      if (input$limit_diffz) {
-                                        range_limits <- as.double(input$diffz_limits)
-                                      } else {
-                                        maxabs <- max(abs(zz[is.finite(zz)]))
-                                        range_limits <- c(-maxabs, maxabs)
-                                      }
-                                      return(range_limits)
-                                    })
-      
-      
-      xx <- z_list[["age"]]
-      yy <- z_list[["year"]]
-      zz <- z_list[["vals"]]
-      
-      n_ages <- length(xx)
-      n_years <- length(yy)
-      
-      range_limits <- range_limits()
-      maxabs <- max(abs(range_limits))
-      
-      yearvec <- rep(yy, times = length(xx))
-      agevec <- rep(xx, each = length(yy))
-      cohortvec <- yearvec - agevec
-      
-      rr <- 10 ^ zz # mortality ratio
-      
-      
-      custom_text <- paste0(
-        "In ",
-        yearvec,
-        ", at age ",
-        agevec,
-        " (",
-        cohortvec,
-        " birth cohort)\n",
-        "Diff in log mortality: ",
-        paste0(round(zz, 2)),
-        "\nRatio: ",
-        paste0(round(rr, 2)),
-        " (",
-        paste0(round(1 / rr, 2)),
-        ")"
-      ) %>%
-        matrix(length(yy), length(xx))
-      
-      p <- plot_ly(showscale = FALSE,
-                   source = "mort_group_surface") %>%
-        add_surface(
-          name = "Diff in LMR",
-          x = ~ xx,
-          y = ~ yy,
-          z = ~ zz,
-          surfacecolor = ~ zz,
-          colorscale = list(
-            seq(
-              from = -maxabs,
-              to = maxabs,
-              length.out = 10
-            ),
-            colorRampPalette(RColorBrewer::brewer.pal(5, "RdBu"))(10)
-          ),
-          hoverinfo = "text",
-          text = custom_text,
-          cmin = range_limits[1],
-          cmax = range_limits[2],
-          cauto = F
-        ) %>%
-        add_surface(
-          name = "equal ratio",
-          x = ~ c(min(xx), max(xx)),
-          y = ~ c(min(yy), max(yy)),
-          z = ~ matrix(rep(0, 4), nrow = 2),
-          opacity = 0.5
-        ) %>%
-        layout(
-          scene = list(
-            zaxis = list(title = "Diff in log mortality"),
-            xaxis = list(title = "age in years"),
-            yaxis = list(title = "year"),
-            aspectratio = list(
-              x = n_ages / n_years,
-              y = 1,
-              z = 0.5
-            ),
-            showlegend = FALSE
-          )
-        )
-      
-    } else if (input$group_mode == 'both') {
-      z_list <- make_z_list_pop(diffs, what = "diff_lmr")
-      z_list_A <- make_z_list_pop(diffs, what = "A")
-      z_list_B <- make_z_list_pop(diffs, what = "B")
-      
-      
-      range_limits <- eventReactive(input$recalc,
-                                    {
-                                      if (input$limit_diffz) {
-                                        range_limits <- as.double(input$diffz_limits)
-                                      } else {
-                                        maxabs <- max(abs(zz[is.finite(zz)]))
-                                        range_limits <-
-                                          c(-maxabs, maxabs)
-                                      }
-                                      return(range_limits)
-                                    })
-      
-      
-      xx <- z_list[["age"]]
-      yy <- z_list[["year"]]
-      zz <- z_list[["vals"]]
-      zz_a <- z_list_A[["vals"]]
-      zz_b <- z_list_B[["vals"]]
-      
-      n_ages <- length(xx)
-      n_years <- length(yy)
-      
-      range_limits <- range_limits()
-      maxabs <- max(abs(range_limits))
-      
-      yearvec <- rep(yy, times = length(xx))
-      agevec <- rep(xx, each = length(yy))
-      cohortvec <- yearvec - agevec
-      
-      rr <- 10 ^ zz # mortality ratio
-      
-      
-      custom_text <- paste0(
-        "In ",
-        yearvec,
-        ", at age ",
-        agevec,
-        " (",
-        cohortvec,
-        " birth cohort)\n",
-        "Diff in log mortality: ",
-        paste0(round(zz, 2)),
-        "\nRatio: ",
-        paste0(round(rr, 2)),
-        " (",
-        paste0(round(1 / rr, 2)),
-        ")",
-        "\nTop: ",
-        paste0(round(zz_b, 2)),
-        "\tBottom: ",
-        paste0(round(zz_a, 2))
-      ) %>%
-        matrix(length(yy), length(xx))
-      
-      new_alpha_A <- eventReactive(input$recalc,
-                                   input$group_A_alpha)
-      
-      new_alpha_B <- eventReactive(input$recalc,
-                                   input$group_B_alpha)
-      
-      p <- plot_ly(showscale = FALSE,
-                   source = "mort_group_surface") %>%
-        add_surface(
-          name = "LMR in A",
-          x = ~ xx,
-          y = ~ yy,
-          z = ~ zz_a,
-          colorscale = list(c(0, 1),
-                            c('red' , 'red')),
-          opacity = new_alpha_A(),
-          hoverinfo = "text",
-          text = custom_text,
-          cmin = range_limits[1],
-          cmax = range_limits[2],
-          cauto = F
-        ) %>%
-        add_surface(
-          name = "LMR in B",
-          x = ~ xx,
-          y = ~ yy,
-          z = ~ zz_b,
-          opacity = new_alpha_B(),
-          colorscale = list(c(0, 1),
-                            c('blue' , 'blue')),
-          hoverinfo = "text",
-          text = custom_text,
-          cmin = range_limits[1],
-          cmax = range_limits[2],
-          cauto = F
-        ) %>%
-        layout(
-          scene = list(
-            zaxis = list(title = "log mortality"),
-            xaxis = list(title = "age in years"),
-            yaxis = list(title = "year"),
-            aspectratio = list(
-              x = n_ages / n_years,
-              y = 1,
-              z = 0.5
-            ),
-            showlegend = FALSE
-          )
-        )
-      
-      
-    }
-    
-    
-    
-    
-    return(p)
-  })
-  
-  
-  output$mort_group_subplot <- renderPlotly({
-    if (input$group_mode == 'diff') {
-      # cat(file=stderr(), "the value of recalc is ", input$recalc,"\n")
-      s <- event_data("plotly_click", source = "mort_group_surface")
-      # cat(file=stderr(), "s ", ifelse(is.null(s), "is", "is not"), "NULL\n")
-      
-      if (is.null(s)) {
-        return(NULL)
-      } else {
-        diffs <- newdata() %>%
-          select(pop_group, year, age, lmr) %>%
-          spread(pop_group, lmr) %>%
-          mutate(diff_lmr = B - A)
-        
-        this_age <- s$x[1]
-        this_year <- s$y[1]
-        this_cohort <- this_year - this_age
-        
-        absmax <- max(abs(diffs$diff_lmr), na.rm = T)
-        
-        p1 <- diffs %>%
-          filter(age == this_age) %>%
-          plot_ly(x = ~ year, y = ~ diff_lmr) %>%
-          add_lines(
-            showlegend = FALSE,
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Year: ",
-              year,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
-              )
-            )
-          )
-        
-        p2 <- diffs %>%
-          filter(year == this_year) %>%
-          plot_ly(x = ~ age, y = ~ diff_lmr) %>%
-          add_lines(
-            showlegend = FALSE,
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Age: ",
-              age,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
-              )
-            )
-          )
-        
-        p3 <- diffs %>%
-          mutate(birth_cohort = year - age) %>%
-          filter(birth_cohort == this_cohort) %>%
-          plot_ly(x = ~ age, y = ~ diff_lmr) %>%
-          add_lines(
-            showlegend = FALSE,
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Age: ",
-              age,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
-              )
-            )
-          )
-        
-        p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
-          layout(
-            yaxis = list(title = "Difference in log mortalities",
-                         range = c(-absmax, absmax)),
-            xaxis = list(title = paste0(
-              "Difference by year at age ", this_age
-            )),
-            xaxis2 = list(
-              title = paste0("Difference by age in year ", this_year),
-              range = c(0, 100)
-            ),
-            xaxis3 = list(
-              title = paste0("Difference by age for ", this_cohort, " birth cohort"),
-              range = c(0, 100)
-            ),
-            title = paste0(
-              "Differences in log mortality between population groups in year ",
-              this_year,
-              " and age ",
-              this_age
-            ),
-            showlegend = FALSE
-          )
-      }
-    } else if (input$group_mode == 'both') {
-      # cat(file=stderr(), "the value of recalc is ", input$recalc,"\n")
-      s <- event_data("plotly_click", source = "mort_group_surface")
-      # cat(file=stderr(), "s ", ifelse(is.null(s), "is", "is not"), "NULL\n")
-      
-      if (is.null(s)) {
-        return(NULL)
-      } else {
-        diffs <- newdata() %>%
-          select(pop_group, year, age, lmr) %>%
-          spread(pop_group, lmr) %>%
-          mutate(diff_lmr = B - A)
-        
-        this_age <- s$x[1]
-        this_year <- s$y[1]
-        this_cohort <- this_year - this_age
-        
-        absmax <- max(abs(c(diffs$A, diffs$B)), na.rm = T)
-        
-        p1 <- diffs %>%
-          filter(age == this_age) %>%
-          plot_ly(x = ~ year) %>%
-          add_lines(
-            y = ~ B,
-            line = list(color = 'blue'),
-            showlegend = FALSE,
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Year: ",
-              year,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
-              )
-            )
-          ) %>%
-          add_lines(
-            y = ~ A,
-            line = list(color = 'red'),
-            showlegend = FALSE,
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Year: ",
-              year,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " fewer deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " more deaths")
-              )
-            )
-          )
-        
-        p2 <- diffs %>%
-          filter(year == this_year) %>%
-          plot_ly(x = ~ age) %>%
-          add_lines(
-            y = ~ B,
-            showlegend = FALSE,
-            line = list(color = 'blue'),
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Age: ",
-              age,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
-              )
-            )
-          ) %>%
-          add_lines(
-            y = ~ A,
-            showlegend = FALSE,
-            line = list(color = 'red'),
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Age: ",
-              age,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " fewer deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " more deaths")
-              )
-            )
-            
-          )
-        
-        p3 <- diffs %>%
-          mutate(birth_cohort = year - age) %>%
-          filter(birth_cohort == this_cohort) %>%
-          plot_ly(x = ~ age) %>%
-          add_lines(
-            y = ~ B,
-            line = list(color = 'blue'),
-            showlegend = FALSE,
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Age: ",
-              age,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " more deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " fewer deaths")
-              )
-            )
-          ) %>%
-          add_lines(
-            y = ~ A,
-            line = list(color = 'red'),
-            showlegend = FALSE,
-            hoverinfo = 'text',
-            text = ~ paste0(
-              "Age: ",
-              age,
-              '\nLog mortalities: ',
-              round(B, 3),
-              ' - ',
-              round(A, 3),
-              ' = ',
-              round(diff_lmr, 3),
-              '\nDeaths per 10,000: ',
-              round(10000 * 10 ^ B, 0),
-              ' - ',
-              round(10000 * 10 ^ A, 0),
-              "\nso ",
-              ifelse(
-                B > A,
-                paste0(round(10000 * (10 ^ B - 10 ^ A), 0), " fewer deaths"),
-                paste0(round(10000 * (10 ^ A - 10 ^ B), 0), " more deaths")
-              )
-            )
-          )
-        
-        
-        p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
-          layout(
-            yaxis = list(title = "Log mortality rate",
-                         range = c(-absmax, 0)),
-            xaxis = list(title = paste0(
-              "Log mortality year at age ", this_age
-            )),
-            xaxis2 = list(
-              title = paste0("Log mortality by age in year ", this_year),
-              range = c(0, 100)
-            ),
-            xaxis3 = list(
-              title = paste0("Log mortality by age for ", this_cohort, " birth cohort"),
-              range = c(0, 100)
-            ),
-            title = paste0(
-              "Log mortality rates for population groups in year ",
-              this_year,
-              " and age ",
-              this_age
-            ),
-            showlegend = FALSE
-          )
-      }
-    }
-    return(p)
-  })
+  output$mort_group_surface <- renderPlotly({return_mortgroup_surface(newdata = newdata, input = input) })
+  output$mort_group_subplot <- renderPlotly({return_mortgroup_subplot(newdata = newdata, input = input) })
   
   output$tadpole_plot <- renderPlotly({
     browser()
