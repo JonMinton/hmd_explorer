@@ -310,6 +310,165 @@ return_mort_subplot <- function(full_data, input){
   
 }
 
+return_pop_surface <- function(full_data = full_data, input = input){
+  this_code <- input$code_select
+  this_gender <- input$gender_select
+  
+  if (this_gender == "Total") {
+    dta_ss <- full_data %>%
+      filter(code == this_code) %>%
+      filter(gender != "Total") %>%
+      group_by(code, age, year) %>%
+      mutate(cumulative_pop = cumsum(num_population)) %>%
+      ungroup()
+    
+  } else {
+    dta_ss <- full_data %>%
+      filter(code == this_code) %>%
+      filter(gender == this_gender)
+  }
+  
+  
+  if (input$limit_age) {
+    dta_ss <- dta_ss %>%
+      filter(age >= input$age_limits[1], age <= input$age_limits[2])
+  }
+  
+  if (input$limit_period) {
+    dta_ss <- dta_ss %>%
+      filter(year >= input$period_limits[1],
+             year <= input$period_limits[2])
+  }
+  
+  if (this_gender == "Total") {
+    z_list <- dta_ss %>%
+      group_by(code, gender) %>%
+      nest() %>%
+      mutate(pop_list = map(data, make_z_list_pop, what = "cumulative_pop"))
+    
+  } else {
+    z_list <- dta_ss %>%
+      group_by(code, gender) %>%
+      nest() %>%
+      mutate(pop_list = map(data, make_z_list_pop, what = "num_population"))
+  }
+  
+  
+  if (this_gender == "Total") {
+    xx <- z_list[["pop_list"]][[1]][["age"]]
+    yy <- z_list[["pop_list"]][[1]][["year"]]
+    zzf <- z_list[["pop_list"]][[1]][["vals"]] # females
+    zzm <- z_list[["pop_list"]][[2]][["vals"]] # males
+    
+    n_ages <- length(xx)
+    n_years <- length(yy)
+    
+    custom_text <- paste0(
+      "In ",
+      rep(yy, times = n_ages),
+      ", at age ",
+      rep(xx, each = n_years),
+      " there were\n",
+      scales::comma(round(zzf, 0)),
+      " females and ",
+      scales::comma(round(zzm - zzf, 0)),
+      " males.",
+      "\nF:M  (M:F) ratio: ",
+      round(zzf / (zzm - zzf), 3),
+      " (",
+      round((zzm - zzf) / zzf, 3),
+      ")"
+    ) %>%
+      matrix(length(yy), length(xx))
+    
+    
+    p <- plot_ly(showscale = FALSE,
+                 source = "pop_surface") %>%
+      add_surface(
+        x = ~ xx,
+        y = ~ yy,
+        z = ~ zzf,
+        name = "Females",
+        opacity = 0.7,
+        colorscale = list(c(0, 1),
+                          c("red", "red")),
+        hoverinfo = "text",
+        text = custom_text
+      ) %>%
+      add_surface(
+        x = ~ xx,
+        y = ~ yy,
+        z = ~ zzm,
+        name = "Males",
+        opacity = 0.7,
+        colorscale = list(c(0, 1),
+                          c("blue", "blue")),
+        hoverinfo = "text",
+        text = custom_text
+      ) %>%
+      layout(
+        scene = list(
+          zaxis = list(title = "Population"),
+          xaxis = list(title = "age in years"),
+          yaxis = list(title = "year"),
+          aspectratio = list(
+            x = n_ages / n_years,
+            y = 1,
+            z = 0.5
+          ),
+          showlegend = FALSE
+        )
+      )
+    
+    
+    
+  } else {
+    xx <- z_list[["pop_list"]][[1]][["age"]]
+    yy <- z_list[["pop_list"]][[1]][["year"]]
+    zz <- z_list[["pop_list"]][[1]][["vals"]]
+    
+    n_ages <- length(xx)
+    n_years <- length(yy)
+    
+    custom_text <- paste0(
+      "In ",
+      rep(yy, times = n_ages),
+      " there were\n",
+      scales::comma(round(zz, 0)),
+      ifelse(this_gender == "Male", " males", " females"),
+      "\nof age ",
+      rep(xx, each = n_years)
+    ) %>%
+      matrix(length(yy), length(xx))
+    
+    p <-   plot_ly(
+      x = ~ xx,
+      y = ~ yy,
+      z = ~ zz,
+      surfacecolor = ~ zz,
+      source = "pop_surface"
+    ) %>% add_surface(
+      colorbar = list(title = "Population"),
+      hoverinfo = "text",
+      text = custom_text
+    ) %>%
+      layout(scene = list(
+        zaxis = list(title = "Population"),
+        xaxis = list(title = "age in years"),
+        yaxis = list(title = "year"),
+        aspectratio = list(
+          x = n_ages / n_years,
+          y = 1,
+          z = 0.5
+        )
+      ))
+    
+  }
+  
+  return(p)
+}
+
+
 shinyServer(function(input, output) {
   newdata <- eventReactive(input$recalc,
                            {get_selected_data(full_data = full_data, input = input)
@@ -318,164 +477,8 @@ shinyServer(function(input, output) {
   output$mort_surface <- renderPlotly({return_mort_surface(full_data = full_data, input = input)  })
   output$mort_subplot <- renderPlotly({return_mort_subplot(full_data = full_data, input = input)  })
   
-  output$pop_surface <- renderPlotly({
-    this_code <- input$code_select
-    this_gender <- input$gender_select
-    
-    if (this_gender == "Total") {
-      dta_ss <- full_data %>%
-        filter(code == this_code) %>%
-        filter(gender != "Total") %>%
-        group_by(code, age, year) %>%
-        mutate(cumulative_pop = cumsum(num_population)) %>%
-        ungroup()
-      
-    } else {
-      dta_ss <- full_data %>%
-        filter(code == this_code) %>%
-        filter(gender == this_gender)
-    }
-    
-    
-    if (input$limit_age) {
-      dta_ss <- dta_ss %>%
-        filter(age >= input$age_limits[1], age <= input$age_limits[2])
-    }
-    
-    if (input$limit_period) {
-      dta_ss <- dta_ss %>%
-        filter(year >= input$period_limits[1],
-               year <= input$period_limits[2])
-    }
-    
-    if (this_gender == "Total") {
-      z_list <- dta_ss %>%
-        group_by(code, gender) %>%
-        nest() %>%
-        mutate(pop_list = map(data, make_z_list_pop, what = "cumulative_pop"))
-      
-    } else {
-      z_list <- dta_ss %>%
-        group_by(code, gender) %>%
-        nest() %>%
-        mutate(pop_list = map(data, make_z_list_pop, what = "num_population"))
-    }
-    
-    
-    if (this_gender == "Total") {
-      xx <- z_list[["pop_list"]][[1]][["age"]]
-      yy <- z_list[["pop_list"]][[1]][["year"]]
-      zzf <- z_list[["pop_list"]][[1]][["vals"]] # females
-      zzm <- z_list[["pop_list"]][[2]][["vals"]] # males
-      
-      n_ages <- length(xx)
-      n_years <- length(yy)
-      
-      custom_text <- paste0(
-        "In ",
-        rep(yy, times = n_ages),
-        ", at age ",
-        rep(xx, each = n_years),
-        " there were\n",
-        scales::comma(round(zzf, 0)),
-        " females and ",
-        scales::comma(round(zzm - zzf, 0)),
-        " males.",
-        "\nF:M  (M:F) ratio: ",
-        round(zzf / (zzm - zzf), 3),
-        " (",
-        round((zzm - zzf) / zzf, 3),
-        ")"
-      ) %>%
-        matrix(length(yy), length(xx))
-      
-      
-      p <- plot_ly(showscale = FALSE,
-                   source = "pop_surface") %>%
-        add_surface(
-          x = ~ xx,
-          y = ~ yy,
-          z = ~ zzf,
-          name = "Females",
-          opacity = 0.7,
-          colorscale = list(c(0, 1),
-                            c("red", "red")),
-          hoverinfo = "text",
-          text = custom_text
-        ) %>%
-        add_surface(
-          x = ~ xx,
-          y = ~ yy,
-          z = ~ zzm,
-          name = "Males",
-          opacity = 0.7,
-          colorscale = list(c(0, 1),
-                            c("blue", "blue")),
-          hoverinfo = "text",
-          text = custom_text
-        ) %>%
-        layout(
-          scene = list(
-            zaxis = list(title = "Population"),
-            xaxis = list(title = "age in years"),
-            yaxis = list(title = "year"),
-            aspectratio = list(
-              x = n_ages / n_years,
-              y = 1,
-              z = 0.5
-            ),
-            showlegend = FALSE
-          )
-        )
-      
-      
-      
-    } else {
-      xx <- z_list[["pop_list"]][[1]][["age"]]
-      yy <- z_list[["pop_list"]][[1]][["year"]]
-      zz <- z_list[["pop_list"]][[1]][["vals"]]
-      
-      n_ages <- length(xx)
-      n_years <- length(yy)
-      
-      custom_text <- paste0(
-        "In ",
-        rep(yy, times = n_ages),
-        " there were\n",
-        scales::comma(round(zz, 0)),
-        ifelse(this_gender == "Male", " males", "females"),
-        "\nof age ",
-        rep(xx, each = n_years)
-      ) %>%
-        matrix(length(yy), length(xx))
-      
-      p <-   plot_ly(
-        x = ~ xx,
-        y = ~ yy,
-        z = ~ zz,
-        surfacecolor = ~ zz,
-        source = "pop_surface"
-      ) %>% add_surface(
-        colorbar = list(title = "Population"),
-        hoverinfo = "text",
-        text = custom_text
-      ) %>%
-        layout(scene = list(
-          zaxis = list(title = "Population"),
-          xaxis = list(title = "age in years"),
-          yaxis = list(title = "year"),
-          aspectratio = list(
-            x = n_ages / n_years,
-            y = 1,
-            z = 0.5
-          )
-        ))
-      
-    }
-    
-    return(p)
-  })
-  
+  output$pop_surface <- renderPlotly({return_pop_surface(full_data = full_data, input = input)    })
+
   output$pop_subplot <- renderPlotly({
     s <- event_data("plotly_click", source = "pop_surface")
     
