@@ -205,115 +205,118 @@ return_mort_surface <- function(full_data, input){
   
 }
 
+return_mort_subplot <- function(full_data, input){
+  
+  s <- event_data("plotly_click", source = "mort_surface")
+  if (length(s) == 0) {
+    return(NULL)
+  } else {
+    this_age <- s$x
+    this_year <- s$y
+    this_cohort = this_year - this_age
+    
+    p1 <- full_data %>%
+      filter(age <= 100) %>%
+      filter(code == input$code_select) %>%
+      filter(gender == input$gender_select) %>%
+      filter(age == this_age) %>%
+      mutate(mr = num_deaths / exposure) %>%
+      plot_ly(x = ~ year, y = ~ mr) %>%
+      add_lines(
+        hoverinfo = 'text',
+        text = ~ paste0(
+          "Year: ",
+          year,
+          '\nLog mortality: ',
+          round(log(mr, 10), 3),
+          '\nDeaths per 10,000: ',
+          round(10000 * mr, 0)
+        )
+      )
+    
+    p2 <- full_data %>%
+      filter(age <= 100) %>%
+      filter(code == input$code_select) %>%
+      filter(gender == input$gender_select) %>%
+      filter(year == this_year) %>%
+      mutate(mr = (num_deaths + 0.5) / (exposure + 0.5)) %>%
+      plot_ly(x = ~ age, y = ~ mr) %>%
+      add_lines(
+        hoverinfo = 'text',
+        text = ~ paste0(
+          "Year: ",
+          year,
+          "\tAge: ",
+          age,
+          '\nLog mortality: ',
+          round(log(mr, 10), 3),
+          '\nDeaths per 10,000: ',
+          round(10000 * mr, 0)
+        )
+      )
+    
+    p3 <- full_data %>%
+      filter(age <= 100) %>%
+      filter(code == input$code_select) %>%
+      filter(gender == input$gender_select) %>%
+      mutate(birth_cohort = year - age) %>%
+      filter(birth_cohort == this_cohort) %>%
+      mutate(mr = (num_deaths + 0.5) / (exposure + 0.5)) %>%
+      plot_ly(x = ~ age, y = ~ mr) %>%
+      add_lines(
+        hoverinfo = 'text',
+        text = ~ paste0(
+          "Year: ",
+          year,
+          "\tAge: ",
+          age,
+          '\nLog mortality: ',
+          round(log(mr, 10), 3),
+          '\nDeaths per 10,000: ',
+          round(10000 * mr, 0)
+        )
+      )
+    
+    this_country_name <-
+      names(codes_named[codes_named == input$code_select])
+    
+    p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
+      layout(
+        yaxis = list(
+          title = "Mortality rate",
+          range = c(-5, 0),
+          type = "log"
+        ),
+        xaxis = list(title = "year"),
+        xaxis2 = list(title = "age", range = c(0, 100)),
+        xaxis3 = list(
+          title = paste0("age for ", this_cohort, " birth cohort"),
+          range = c(0, 100)
+        ),
+        title = paste0(
+          "Mortality schedules for ",
+          input$gender_select,
+          ", ",
+          this_country_name,
+          " in year ",
+          this_year,
+          " and age ",
+          this_age
+        ),
+        showlegend = FALSE
+      )
+  }
+  return(p)
+  
+}
+
 shinyServer(function(input, output) {
   newdata <- eventReactive(input$recalc,
                            {get_selected_data(full_data = full_data, input = input)
             })
   
   output$mort_surface <- renderPlotly({return_mort_surface(full_data = full_data, input = input)  })
-  #
-  output$mort_subplot <- renderPlotly({
-    s <- event_data("plotly_click", source = "mort_surface")
-    if (length(s) == 0) {
-      return(NULL)
-    } else {
-      this_age <- s$x
-      this_year <- s$y
-      this_cohort = this_year - this_age
-      
-      p1 <- full_data %>%
-        filter(age <= 100) %>%
-        filter(code == input$code_select) %>%
-        filter(gender == input$gender_select) %>%
-        filter(age == this_age) %>%
-        mutate(mr = num_deaths / exposure) %>%
-        plot_ly(x = ~ year, y = ~ mr) %>%
-        add_lines(
-          hoverinfo = 'text',
-          text = ~ paste0(
-            "Year: ",
-            year,
-            '\nLog mortality: ',
-            round(log(mr, 10), 3),
-            '\nDeaths per 10,000: ',
-            round(10000 * mr, 0)
-          )
-        )
-      
-      p2 <- full_data %>%
-        filter(age <= 100) %>%
-        filter(code == input$code_select) %>%
-        filter(gender == input$gender_select) %>%
-        filter(year == this_year) %>%
-        mutate(mr = (num_deaths + 0.5) / (exposure + 0.5)) %>%
-        plot_ly(x = ~ age, y = ~ mr) %>%
-        add_lines(
-          hoverinfo = 'text',
-          text = ~ paste0(
-            "Year: ",
-            year,
-            "\tAge: ",
-            age,
-            '\nLog mortality: ',
-            round(log(mr, 10), 3),
-            '\nDeaths per 10,000: ',
-            round(10000 * mr, 0)
-          )
-        )
-      
-      p3 <- full_data %>%
-        filter(age <= 100) %>%
-        filter(code == input$code_select) %>%
-        filter(gender == input$gender_select) %>%
-        mutate(birth_cohort = year - age) %>%
-        filter(birth_cohort == this_cohort) %>%
-        mutate(mr = (num_deaths + 0.5) / (exposure + 0.5)) %>%
-        plot_ly(x = ~ age, y = ~ mr) %>%
-        add_lines(
-          hoverinfo = 'text',
-          text = ~ paste0(
-            "Year: ",
-            year,
-            "\tAge: ",
-            age,
-            '\nLog mortality: ',
-            round(log(mr, 10), 3),
-            '\nDeaths per 10,000: ',
-            round(10000 * mr, 0)
-          )
-        )
-      
-      this_country_name <-
-        names(codes_named[codes_named == input$code_select])
-      
-      p <- subplot(list(p1, p2, p3), shareY = TRUE) %>%
-        layout(
-          yaxis = list(
-            title = "Mortality rate",
-            range = c(-5, 0),
-            type = "log"
-          ),
-          xaxis = list(title = "year"),
-          xaxis2 = list(title = "age", range = c(0, 100)),
-          xaxis3 = list(
-            title = paste0("age for ", this_cohort, " birth cohort"),
-            range = c(0, 100)
-          ),
-          title = paste0(
-            "Mortality schedules for ",
-            input$gender_select,
-            ", ",
-            this_country_name,
-            " in year ",
-            this_year,
-            " and age ",
-            this_age
-          ),
-          showlegend = FALSE
-        )
-    }
-    return(p)
-  })
+  output$mort_subplot <- renderPlotly({return_mort_subplot(full_data = full_data, input = input)  })
   
   output$pop_surface <- renderPlotly({
     this_code <- input$code_select
