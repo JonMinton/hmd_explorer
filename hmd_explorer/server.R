@@ -125,87 +125,92 @@ get_selected_data <- function(full_data, input){
   
 }
 
+return_mort_surface <- function(full_data, input){
+  
+  dta_ss <- full_data %>%
+    filter(code == input$code_select) %>%
+    filter(gender == input$gender_select)
+  
+  
+  if (input$limit_age) {
+    dta_ss <- dta_ss %>%
+      filter(age >= input$age_limits[1], age <= input$age_limits[2])
+  }
+  if (input$limit_period) {
+    dta_ss <- dta_ss %>%
+      filter(year >= input$period_limits[1],
+             year <= input$period_limits[2])
+  }
+  
+  dta_ss <- dta_ss %>%
+    group_by(code, gender) %>%
+    nest()
+  
+  z_list <- dta_ss %>%
+    mutate(lmr_list = map(data, make_z_list, adjust = 0.5))
+  
+  
+  xx <- z_list[["lmr_list"]][[1]][["age"]]
+  yy <- z_list[["lmr_list"]][[1]][["year"]]
+  zz <- 10 ^ z_list[["lmr_list"]][[1]][["vals"]]
+  
+  n_ages <- length(xx)
+  n_years <- length(yy)
+  
+  zc <- z_list[["lmr_list"]][[1]][["vals"]]
+  
+  
+  
+  custom_text <- paste0(
+    "In ",
+    rep(yy, times = n_ages),
+    ", at age ",
+    rep(xx, each = n_years),
+    "\n log mortality: ",
+    round(zc, 3),
+    "\n Deaths per 10,000: ",
+    round(10000 * zz, 0)
+  ) %>%
+    matrix(length(yy), length(xx))
+  
+  p <-   plot_ly(
+    x = ~ xx,
+    y = ~ yy,
+    z = ~ zz,
+    surfacecolor = ~ zc,
+    source = "mort_surface"
+  ) %>% add_surface(
+    colorbar = list(title = "Log Mortality rate"),
+    hoverinfo = "text",
+    text = custom_text
+  ) %>%
+    layout(scene = list(
+      zaxis = list(
+        title = "Mortality rate",
+        type = "log",
+        autorange = TRUE
+      ),
+      xaxis = list(title = "age in years"),
+      yaxis = list(title = "year"),
+      aspectratio = list(
+        x = n_ages / n_years,
+        y = 1,
+        z = 0.5
+      )
+    ))
+  
+  
+  return(p)
+  
+  
+}
+
 shinyServer(function(input, output) {
   newdata <- eventReactive(input$recalc,
                            {get_selected_data(full_data = full_data, input = input)
             })
   
-  output$mort_surface <- renderPlotly({
-    dta_ss <- full_data %>%
-      filter(code == input$code_select) %>%
-      filter(gender == input$gender_select)
-    
-    
-    if (input$limit_age) {
-      dta_ss <- dta_ss %>%
-        filter(age >= input$age_limits[1], age <= input$age_limits[2])
-    }
-    if (input$limit_period) {
-      dta_ss <- dta_ss %>%
-        filter(year >= input$period_limits[1],
-               year <= input$period_limits[2])
-    }
-    
-    dta_ss <- dta_ss %>%
-      group_by(code, gender) %>%
-      nest()
-    
-    z_list <- dta_ss %>%
-      mutate(lmr_list = map(data, make_z_list, adjust = 0.5))
-    
-    
-    xx <- z_list[["lmr_list"]][[1]][["age"]]
-    yy <- z_list[["lmr_list"]][[1]][["year"]]
-    zz <- 10 ^ z_list[["lmr_list"]][[1]][["vals"]]
-    
-    n_ages <- length(xx)
-    n_years <- length(yy)
-    
-    zc <- z_list[["lmr_list"]][[1]][["vals"]]
-    
-    
-    
-    custom_text <- paste0(
-      "In ",
-      rep(yy, times = n_ages),
-      ", at age ",
-      rep(xx, each = n_years),
-      "\n log mortality: ",
-      round(zc, 3),
-      "\n Deaths per 10,000: ",
-      round(10000 * zz, 0)
-    ) %>%
-      matrix(length(yy), length(xx))
-    
-    p <-   plot_ly(
-      x = ~ xx,
-      y = ~ yy,
-      z = ~ zz,
-      surfacecolor = ~ zc,
-      source = "mort_surface"
-    ) %>% add_surface(
-      colorbar = list(title = "Log Mortality rate"),
-      hoverinfo = "text",
-      text = custom_text
-    ) %>%
-      layout(scene = list(
-        zaxis = list(
-          title = "Mortality rate",
-          type = "log",
-          autorange = TRUE
-        ),
-        xaxis = list(title = "age in years"),
-        yaxis = list(title = "year"),
-        aspectratio = list(
-          x = n_ages / n_years,
-          y = 1,
-          z = 0.5
-        )
-      ))
-    
-    
-    return(p)
-  })
+  output$mort_surface <- renderPlotly({return_mort_surface(full_data = full_data, input = input)  })
   #
   output$mort_subplot <- renderPlotly({
     s <- event_data("plotly_click", source = "mort_surface")
