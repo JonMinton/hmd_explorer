@@ -21,7 +21,7 @@ calc_qx <- function(age, sex, deaths, exposure){
   {
     if(m_x > 0.107) 
     {
-      if (sex == "female")
+      if (sex == "Female")
       {
         0.350
       } else 
@@ -31,7 +31,7 @@ calc_qx <- function(age, sex, deaths, exposure){
       
     } else 
     {
-      if (sex == "female") 
+      if (sex == "Female") 
       {
         0.053 + 2.800 * m_x
       } else 
@@ -50,26 +50,26 @@ calc_qx <- function(age, sex, deaths, exposure){
 
 
 
-
-dta_synth <- dta_both %>% 
-  mutate(
-    q_x = pmap_dbl(
-      .l = list(
-        age = age,
-        sex = sex,
-        deaths = deaths, 
-        exposure = exposure
-      ), 
-      .f = possibly(calc_qx, otherwise = NA)
-    ),
-    p_x = 1 - q_x
-  ) %>% 
-  arrange(country, year, sex, age) %>%
-  group_by(country, year, sex) %>% 
-  do(calculate_survivors_properly(.)) %>% 
-  mutate(cumulative_deaths = init_cohort_size - cohort_size)
-
-
+# 
+# dta_synth <- dta_both %>% 
+#   mutate(
+#     q_x = pmap_dbl(
+#       .l = list(
+#         age = age,
+#         sex = sex,
+#         deaths = deaths, 
+#         exposure = exposure
+#       ), 
+#       .f = possibly(calc_qx, otherwise = NA)
+#     ),
+#     p_x = 1 - q_x
+#   ) %>% 
+#   arrange(country, year, sex, age) %>%
+#   group_by(country, year, sex) %>% 
+#   do(calculate_survivors_properly(.)) %>% 
+#   mutate(cumulative_deaths = init_cohort_size - cohort_size)
+# 
+# 
 
 # proper_counts <- proper_counts %>% 
 #   mutate(

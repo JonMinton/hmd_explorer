@@ -1,11 +1,4 @@
-#
-# This is the server logic of a Shiny web application. You can run the
-# application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
+
 suppressPackageStartupMessages(expr = {
   library(plotly, warn.conflicts = FALSE)
   library(tidyverse, warn.conflicts = FALSE)
@@ -21,6 +14,7 @@ fld_data <- normalizePath(file.path(fld_this, "data"),
 full_data <- read_csv(file.path(fld_data, "hmd_data.csv"))
 names(full_data) <- tolower(names(full_data))
 
+
 codes_named <- read_rds(file.path(fld_data, "codes_named.rds"))
 
 hmd_e0 <- read_csv(file.path(fld_data, "hmd_e0.csv"))
@@ -30,6 +24,8 @@ names(hmd_e0) <- tolower(names(hmd_e0))
 hmd_e0 <- hmd_e0 %>%
   mutate(gender = tolower(gender))
 
+source("scripts/calc_qx.R")
+#message("the wd is ", getwd())
 
 
 ### FUNCTIONS
@@ -130,7 +126,6 @@ return_mort_surface <- function(full_data, input){
   dta_ss <- full_data %>%
     filter(code == input$code_select) %>%
     filter(gender == input$gender_select)
-  
   
   if (input$limit_age) {
     dta_ss <- dta_ss %>%
@@ -1610,6 +1605,46 @@ shinyServer(function(input, output) {
   
   output$mort_group_surface <- renderPlotly({return_mortgroup_surface(newdata = newdata, input = input) })
   output$mort_group_subplot <- renderPlotly({return_mortgroup_subplot(newdata = newdata, input = input) })
+  
+  output$lifetable_surface <- renderPlot({
+
+    this_code <- input$code_select
+    this_gender <- input$gender_select_nototal
+    dta_ss <- full_data %>%
+      filter(code == this_code) %>%
+      filter(gender == this_gender)
+    
+    
+    if (input$limit_age) {
+      dta_ss <- dta_ss %>%
+        filter(age >= input$age_limits[1], age <= input$age_limits[2])
+    }
+    
+    if (input$limit_period) {
+      dta_ss <- dta_ss %>%
+        filter(year >= input$period_limits[1],
+               year <= input$period_limits[2])
+    }
+    
+    dta_synth <- dta_ss %>%
+      mutate(
+        q_x = pmap_dbl(
+          .l = list(
+            age = age,
+            sex = gender,
+            deaths = num_deaths,
+            exposure = exposure
+          ),
+          .f = possibly(calc_qx, otherwise = NA)
+        ),
+        p_x = 1 - q_x
+      ) 
+
+    p <- ggplot(dta_synth, aes(x = year, y = age, fill = p_x)) +
+      geom_tile() 
+    
+    return(p)
+  })
   
   output$tadpole_plot <- renderPlotly({
     browser()

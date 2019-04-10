@@ -88,6 +88,13 @@ shinyUI(fluidPage(
                                    choices = c("Male", "Female", "Total"),
                                    selected = "Total")
       ),
+      conditionalPanel("input.tabset_1=='Lifetable' ",
+                       selectInput("gender_select_nototal",
+                                   "Select gender of interest",
+                                   choices = c("Male", "Female"),
+                                   selected = "Female")
+      ),
+      
       conditionalPanel("input.tabset_1 != 'Tadpole Charts'",
                        checkboxInput("limit_age",
                                      "Check to limit ages",
@@ -163,7 +170,13 @@ shinyUI(fluidPage(
                     title = "Mortality Group Comparisons",
                     plotlyOutput("mort_group_surface"),
                     plotlyOutput("mort_group_subplot")
-                  )#,
+                  ), 
+                  tabPanel(
+                    title = "Lifetable",
+                    plotOutput("lifetable_surface")
+                  )
+                  
+                  #,
                   # tabPanel(
                   #   title = "Tadpole Charts",
                   #   plotlyOutput("tadpole_plot")
