@@ -3,7 +3,9 @@ title: "Decadal age distribution"
 output: html_notebook
 ---
 
-This will show how the age distribution within different decadal bands of birth cohorts varies in Scotland
+This will show how the age distribution within different decadal bands of birth cohorts varies in Scotland.
+
+**Note to self**: The birth cohort decades used are 1905-1965, so 1965-1975 not a clear limitation for this analysis. (But could be if the analysis were to be replicated in another decade.)
 
 ```{r}
 rm(list = ls())
@@ -32,4 +34,27 @@ dta %>%
 ```
 
 From this it appears that the only notable asymmetry in the distribution of births within the birth cohort decade is for the 1965-74 birth cohort decade. (i.e. the decade where contraceptives became much more widely available and effective). This means that this birth cohort decade may be biased towards older ages, and so there's a risk of artefact, especially in comparison with the following decade. i.e. even if there's no genuine improvement in mortality/morbidity between the 1965-1974 and 1975-1984 decade, some apparent improvement would be expected from the differential age structure in the former decade alone. 
+
+Fortunately the last birth cohort considered is 1955-1965. 
+
+Let's now try to tabulate mean and sd for the above 
+
+```{r}
+dta %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(Age == 0) %>% 
+  filter(gender != "Total") %>% 
+  mutate(
+    birth_decade = cut(Year, breaks = seq(1905, 2015, by = 10))
+  ) %>% 
+  filter(!is.na(birth_decade)) %>% 
+  group_by(gender, birth_decade) %>% 
+  mutate(year_in_decade = 1:10) %>% 
+  mutate(prop_popn_in_decade = num_population / sum(num_population)) %>% 
+  summarise(mean_in_decade = sum(num_population * year_in_decade) / sum(num_population)) %>% 
+  ggplot(aes(x = birth_decade, y = mean_in_decade, colour = gender, group = gender)) +
+  geom_line() + geom_point() + coord_flip()
+
+```
+
 
