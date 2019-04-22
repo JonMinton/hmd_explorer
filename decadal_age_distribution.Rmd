@@ -1,0 +1,35 @@
+---
+title: "Decadal age distribution"
+output: html_notebook
+---
+
+This will show how the age distribution within different decadal bands of birth cohorts varies in Scotland
+
+```{r}
+rm(list = ls())
+
+library(tidyverse)
+
+dta <- read_csv("hmd_explorer/data/hmd_data.csv")
+
+dta %>% 
+  filter(code == "GBR_SCO") %>% 
+  filter(Age == 0) %>% 
+  filter(gender != "Total") %>% 
+  mutate(
+    birth_decade = cut(Year, breaks = seq(1905, 2015, by = 10))
+  ) %>% 
+  filter(!is.na(birth_decade)) %>% 
+  group_by(gender, birth_decade) %>% 
+  mutate(year_in_decade = 1:10) %>% 
+  mutate(prop_popn_in_decade = num_population / sum(num_population)) %>% 
+  ggplot(aes(x = factor(year_in_decade), y = prop_popn_in_decade, group = gender, fill = gender, colour = gender)) +
+  geom_histogram(stat= "identity") +
+  facet_wrap(~birth_decade)
+
+
+
+```
+
+From this it appears that the only notable asymmetry in the distribution of births within the birth cohort decade is for the 1965-74 birth cohort decade. (i.e. the decade where contraceptives became much more widely available and effective). This means that this birth cohort decade may be biased towards older ages, and so there's a risk of artefact, especially in comparison with the following decade. i.e. even if there's no genuine improvement in mortality/morbidity between the 1965-1974 and 1975-1984 decade, some apparent improvement would be expected from the differential age structure in the former decade alone. 
+
