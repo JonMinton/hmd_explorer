@@ -1,7 +1,7 @@
 Linking displays, creating 3D surfaces, and adding custom tooltips in Plotly via Shiny
 ========================================================
 author: Jon Minton
-date: 10/3/2019
+date: 24/4/2019
 autosize: true
 
 Population Data as Spatial Data
