@@ -43,20 +43,26 @@ make_graphics_ui <- function(id){
     textOutput(ns("colourscheme_selected")),
     textOutput(ns("devicevis_selected")),
     textOutput(ns("dims_of_data")),
-    textOutput(ns("selected_continuityvalue")),
+    textOutput(ns("continuity_selected")),
+    verbatimTextOutput(ns("mode_selected")),
     br(),
     uiOutput(ns("mainplot"))
   )
 }
 
-make_graphics_server <- function(input, output, session, data){
+make_graphics_server <- function(input, output, session, mode = "singular-singular", data){
   ns <- session$ns
   
   # Internal functions
 
   
   # Given the specified outcome, produce a table with age, year and the outcome
-  derive_outcome <- function(data, outcome, correction = 5){
+  derive_outcome <- function(data, outcome, correction){
+
+    if (is.null(correction)){
+      correction <- 0
+    }
+    
     data <- data()
 
     output <- if (outcome == "Log mortality"){
@@ -109,13 +115,24 @@ make_graphics_server <- function(input, output, session, data){
     p
   }
   
-  
   produce_surface_plotly <- function(data, colscheme, devicetype){
     
     colscheme_tidied  <- colscheme %>% 
       str_split(":") %>% 
       pluck(1) %>% 
       setNames(c("Family", "pal"))
+    
+    if (colscheme_tidied["Family"] == "Viridis") {
+      hue_posn <- seq(0, 1, length = 20)
+      colscale_list <- list(
+          hue_posn,
+          viridis_pal(option = colscheme_tidied["pal"])(20)                
+      )
+    } else {
+      
+      # DO FOR OTHER PALETTES HERE
+    }
+    
     
     make_z_list <- function(X) {
       # adjust: amount to add to numerator and denominator
@@ -130,20 +147,46 @@ make_graphics_server <- function(input, output, session, data){
       out <- list(age = ages, year = years, vals = val_mtrx)
     }
     
-    
     data_mtrx <- make_z_list(data)
 
     
-    p <- plot_ly(z = ~data_mtrx[["vals"]], 
-                 x = ~data_mtrx[["year"]],
-                 y = ~data_mtrx[["age"]]
-    )
+    n_ages  <-  length(data_mtrx[["age"]]  )
+    n_years <-  length(data_mtrx[["year"]] )
     
     if (devicetype == "plotly:lexis"){
-      p <- p %>% add_heatmap()
+      p <- plot_ly(z = ~t(data_mtrx[["vals"]]), 
+                   x = ~data_mtrx[["year"]],
+                   y = ~data_mtrx[["age"]]
+      ) %>% 
+        add_heatmap(
+          colorscale = colscale_list
+          
+        ) %>%  
+        layout(
+          yaxis = list(title = "Age in years"),
+          xaxis = list(title = "Year")
+        )
       
     } else if (devicetype == "plotly:3d_surface"){
-      p <- p %>% add_surface()
+
+      
+      p <- plot_ly(z = ~data_mtrx[["vals"]], 
+                   y = ~data_mtrx[["year"]],
+                   x = ~data_mtrx[["age"]]
+      ) %>% add_surface(
+        colorscale = colscale_list
+        
+      ) %>% 
+        layout(scene = list(
+          zaxis = list(title = "Z"),
+          xaxis = list(title = "Age in years"),
+          yaxis = list(title = "Year"),
+          aspectratio = list(
+            x = n_ages / n_years,
+            y = 1,
+            z = 0.5
+          )
+        ))
     }  else {
       return(NULL)
     }  
@@ -156,8 +199,8 @@ make_graphics_server <- function(input, output, session, data){
   selected_outcome          <- reactive({input$select_outcome        })
   selected_colourscheme     <- reactive({input$select_colourscheme   })
   selected_devicevis        <- reactive({input$select_devicevis      })
-  selected_add_continuity   <- reactive({input$add_continuity})
-  selected_continuityvalue  <- reactive({req(input$continuity_value)})
+  selected_add_continuity   <- reactive({input$add_continuity        })
+  selected_continuityvalue  <- reactive({input$continuity_value      })
   
   
   output$dynamic_continuity <- renderUI({
@@ -177,7 +220,8 @@ make_graphics_server <- function(input, output, session, data){
   output$outcome_selected         <- reactive({selected_outcome()          })
   output$colourscheme_selected    <- reactive({selected_colourscheme()     })
   output$devicevis_selected       <- reactive({selected_devicevis()        })
-  output$continuity_selected      <- reactive({selected_continuityvalue()  })
+  output$continuity_selected      <- reactive({paste("Cont value:", selected_continuityvalue())  })
+  output$mode_selected            <- reactive({mode})
 
   
   output$dims_of_data <- renderText({
@@ -185,11 +229,12 @@ make_graphics_server <- function(input, output, session, data){
   })
   
   output$main_ggplot <- renderPlot({
-    derive_outcome(data(), selected_outcome()) %>% 
+    derive_outcome(data(), selected_outcome(), correction = selected_continuityvalue()) %>% 
       produce_surface_ggplot(selected_colourscheme(), selected_devicevis())
   })
+  
   output$main_plotly <- renderPlotly({
-    derive_outcome(data(), selected_outcome()) %>% 
+    derive_outcome(data(), selected_outcome(), correction = selected_continuityvalue()) %>% 
       produce_surface_plotly(selected_colourscheme(), selected_devicevis())
   })
   

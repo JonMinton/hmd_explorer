@@ -602,3 +602,148 @@ server <- function(input, output){
 shinyApp(ui = ui, server = server)
 
 
+
+# Want a reactive input 
+
+module_ui <- function(id){
+  ns <- NS(id)
+  
+  tagList(
+    checkboxInput(ns("checkbox_condition"), 
+                label = "Check to display slider",
+                value = FALSE
+    )#, 
+    # sliderInput(ns("conditional_value"),
+    #             label = "slide to select value", 
+    #             min = 0, max = 5, value = 2
+    # ),
+    # uiOutput(ns("selective_slider")),
+    #   
+    # textOutput(ns("output_from_checkbox")),
+    # textOutput(ns("output_from_conditional_value"))
+    
+  )
+  
+}
+
+
+module_server <- function(input, output, session){
+  ns <- session$ns
+  
+  # get_conditional_value <- reactive({output$conditional_value})
+  # get_checkbox_value    <- reactive({input$selective_slider})
+  
+  # output$output_from_checkbox          <- renderText({
+  #   paste("The value from the checkbox is", get_checkbox_value())
+  # })
+
+  input$selective_slider <- renderUI({
+    if(!get_conditional_value()){
+      return(NULL)
+    } else { sliderInput(ns("conditional_value"),
+                         label = "slide to select value",
+                         min = 0, max = 5, value = 2
+    )
+    }
+  })
+
+
+  output$output_from_conditional_value <- renderText({
+    paste("The conditional value is", get_conditional_value())
+  })
+
+  
+}
+
+
+ui <- fluidPage(
+  titlePanel("Conditional slider"),
+  fluidRow(
+    module_ui("module")
+  )
+)
+
+server <- function(input, output){
+  callModule(module_server, "module")
+}
+
+shinyApp(ui = ui, server = server)
+
+
+###############################################
+
+
+module_ui <- function(id){
+  ns <- NS(id)
+  
+  tagList(
+    checkboxInput(ns("checkbox_condition"), 
+                  label = "Check to display slider",
+                  value = FALSE
+    ),
+    
+    sliderInput(ns("slider_input"),
+                 label = "choose slider value", min = 0, max = 5, value =2
+    ),
+    
+    uiOutput(ns("dynamic_part")),
+  
+    verbatimTextOutput(ns("checkbox_condition_output")),
+    verbatimTextOutput(ns("slider_output")),
+    verbatimTextOutput(ns("dynamic_value")),
+    verbatimTextOutput(ns("dynamic_value_class"))
+  )
+  
+}
+
+
+module_server <- function(input, output, session){
+  ns <- session$ns
+  
+  get_checkbox_condition   <- reactive({input$checkbox_condition})
+  get_slider_value         <- reactive({input$slider_input})
+  get_dynamic_value        <- reactive({input$dynamic})
+  get_dynamic_value_class  <- reactive({class(get_dynamic_value())})
+  
+  
+  toss_coin <- function() {rbernoulli(1)}
+  
+
+  
+  output$dynamic_part              <- renderUI({
+#    heads_or_tails <- toss_coin()
+    heads_or_tails <- get_checkbox_condition()   
+    if (heads_or_tails){
+      sliderInput(ns("dynamic"), "Dynamic", 
+                  min = 1, max = 10, value = 3
+      )
+    } else {
+      return()
+#      textInput(ns("dynamic"), "Dynamic"
+#      )
+    }
+    
+  })
+  
+  
+  output$dynamic_value             <-  renderText({get_dynamic_value()})
+  output$checkbox_condition_output <-  renderText({get_checkbox_condition()})
+  output$slider_output             <-  renderText({get_slider_value()})
+  output$dynamic_value_class       <-  renderText({get_dynamic_value_class()})
+}
+
+
+ui <- fluidPage(
+  titlePanel("Conditional slider"),
+  fluidRow(
+    module_ui("module")
+  )
+)
+
+server <- function(input, output){
+  callModule(module_server, "module")
+}
+
+shinyApp(ui = ui, server = server)
+
+

@@ -18,30 +18,62 @@ codes_named <- read_rds("data/codes_named.rds")
 
 source("module_select_data.R")
 source("module_make_graphics.R")
+source("module_make_corrmaps.R")
 
 ui <- fluidPage(
   titlePanel("Human Mortality Database Explorer"),
   
   sidebarLayout(
     sidebarPanel(
-      select_data_ui("data_module")
+      select_data_ui("data_module1_singular"),
+      
+      verbatimTextOutput("tab_active")
       
     ),
     
     # Show a plot of the generated distribution
     mainPanel(
-      make_graphics_ui("graphics_module")
+      tabsetPanel(type = "tabs", id = "main_tabset", 
+        tabPanel("individual",title = "Individual Population",
+          make_graphics_ui("graphics_module_singular-singular")         
+                 ),
+        tabPanel("group", title = "Group of Populations",
+          make_graphics_ui("graphics_module_group-singular")       
+                 ),
+        tabPanel("sex_compare", title = "Comparison between Genders",
+          make_graphics_ui("graphics_module_singular-comparative")       
+                 ),
+        tabPanel("group_compare", title = "Comparison between Populations",
+          make_graphics_ui("graphics_module_group-comparative")       
+                 ),
+        tabPanel("corr_individual", title = "Correlation in trends by age",
+                 make_corrmaps_ui("corrmaps_singular-singular")       
+        )
+        
+      )
     )
   )
 )
 
 server <- function(input, output) {
-  data_ss <- callModule(select_data_server, "data_module")
-  output$dim_of_dta <- renderText({
-    paste("The selection has", dim(data_ss())[1], "rows and", dim(data_ss())[2], "columns")
-  })
+  get_active_tab <- reactive({input$main_tabset})
   
-  callModule(make_graphics_server, "graphics_module", data = data_ss)
+  data1_singular <- callModule(select_data_server, "data_module1_singular")
+
+  
+  callModule(make_graphics_server, "graphics_module_singular-singular", 
+             mode = "singular-singular", data = data1_singular)
+  callModule(make_graphics_server, "graphics_module_group-singular", 
+             mode = "group-singular", data = data1_singular)
+  callModule(make_graphics_server, "graphics_module_singular-comparative", 
+             mode = "singular-comparative", data = data1_singular)
+  callModule(make_graphics_server, "graphics_module_group-comparative", 
+             mode = "group-comparative", data = data1_singular)
+  
+  callModule(make_corrmaps_server, "corrmaps_singular-singular", 
+             data = data1_singular)
+  
+  
 }
 
 
