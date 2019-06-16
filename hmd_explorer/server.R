@@ -1646,30 +1646,7 @@ shinyServer(function(input, output) {
     return(p)
   })
   
-  output$tadpole_plot <- renderPlotly({
-    browser()
-    
-    dta_highlight <- hmd_e0 %>%
-      filter(code == input$tadpole_highlight) %>%
-      filter(gender == "female") %>%
-      filter(year >= input$period_limits[1] - 1,
-             year <= input$period_limits[2]) %>%
-      arrange(year) %>%
-      mutate(delta_e0 = e0 - lag(e0)) %>%
-      mutate(newness = year - min(year)) %>%
-      mutate(newness = newness / max(newness))
-    
-    p <- dta_highlight %>%
-      plot_ly(
-        data = .,
-        x = ~ e0,
-        y = ~ delta_e0,
-        opacity = ~ newness
-      ) %>% # doesn't work but some deeper level hack possible I think
-      add_lines()
-    
-    return(p)
-  })
+
   
   
 })

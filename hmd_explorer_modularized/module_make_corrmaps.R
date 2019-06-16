@@ -50,8 +50,10 @@ make_corrmaps_ui <- function(id){
     textOutput(ns("devicevis_selected")),
     textOutput(ns("continuity_selected")),
     verbatimTextOutput(ns("mode_selected")),
+
     br(),
-    uiOutput(ns("mainplot"))
+    uiOutput(ns("mainplot")),
+    plotlyOutput(ns("show_age_trends"))
   )
 }
 
@@ -102,6 +104,33 @@ make_corrmaps_server <- function(input, output, session, data, mode){
     
     return(cor_df)
   }
+  
+  calc_twoage_data <- function(data, first_age, second_age, correction){
+    
+    if(is.null(correction)){
+      correction <- 0
+    }
+    
+    dta_age1 <- data %>% 
+      # NOTE: CHANGE TO draw from Mx rather than the numerators and denominators (need option for module_Select_data)
+      filter(age == first_age) %>% 
+      mutate(Mx_approx = (num_deaths + correction ) / (num_population + correction)) %>% 
+      mutate(log_mean_Mx = log(Mx_approx, 10)) %>% 
+      select(year, age, log_mean_Mx)
+    
+    dta_age2 <- data %>% 
+      # NOTE: CHANGE TO draw from Mx rather than the numerators and denominators (need option for module_Select_data)
+      filter(age == second_age) %>% 
+      mutate(Mx_approx = (num_deaths + correction ) / (num_population + correction)) %>% 
+      mutate(log_mean_Mx = log(Mx_approx, 10)) %>% 
+      select(year, age, log_mean_Mx)
+    
+    dta_combined <- bind_rows(dta_age1, dta_age2)
+    
+    dta_combined
+    
+  }
+  
   
   plot_corrmap <- function(data, colscheme, scalelimit){
     
@@ -161,6 +190,7 @@ make_corrmaps_server <- function(input, output, session, data, mode){
 
     
     p <- plot_ly(
+      source = "corrmap_main",
       x = ~rownames(data), 
       y = ~colnames(data), 
       z = ~data, 
@@ -173,14 +203,44 @@ make_corrmaps_server <- function(input, output, session, data, mode){
         zmax = scalelimit[2]
       ) %>% 
       layout(
-        yaxis = list(title = "Age"),
+        yaxis = list(
+          title = "Age",
+          scaleanchor = "x"           
+        ),
         xaxis = list(title = "Age")
-        
+
       )
 
     p
   }
   
+  output$show_age_trends <-     renderPlotly({
+    s <- event_data("plotly_click", source = "corrmap_main")
+
+    if(is.null(s)){
+      return(NULL)
+    }
+    
+    first_age      <- s$x
+    second_age     <- s$y 
+
+    
+    data_ss <- data() %>% 
+      calc_twoage_data(
+        first_age   = first_age, 
+        second_age  = second_age, 
+        correction  = selected_continuityvalue())
+    
+    p <- data_ss %>% 
+      plot_ly(
+        x = ~year, y = ~ log_mean_Mx, 
+        color = ~factor(age), 
+        colors = c("red", "darkgreen")
+      ) %>% 
+      add_lines()
+
+    p
+  })
   
   output$dynamic_continuity <- renderUI({
     if (!selected_add_continuity()){
