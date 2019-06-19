@@ -1,6 +1,5 @@
 
 
-
 library(shiny)
 library(tidyverse)
 library(viridis)
@@ -9,25 +8,41 @@ library(plotly)
 
 ### Data 
 
-codes_named <- read_rds("data/codes_named.rds")
+
+suppressPackageStartupMessages(expr = {
+  library(plotly, warn.conflicts = FALSE)
+  library(tidyverse, warn.conflicts = FALSE)
+  library(shiny, warn.conflicts = FALSE)
+})
+
+# Get source directory
+fld_this <- getSrcDirectory(x = function(x) {})
+# Create path to data folder and ensure that it works
+fld_data <- normalizePath(file.path(fld_this, "data/"), 
+                          mustWork = TRUE)
+
+full_data <- read_csv(file.path(fld_data, "hmd_data.csv"))
+
+codes_named <- read_rds(file.path(fld_data, "codes_named.rds"))
 
 #data_all <- read_csv("data/hmd_data.csv")
 #names(data_all) <- tolower(data_all)
 
 # Source
 
-source("module_select_data.R")
-source("module_make_graphics.R")
-source("module_make_corrmaps.R")
+source(file.path(fld_this, "module_select_data.R"))
+source(file.path(fld_this, "module_make_graphics.R"))
+source(file.path(fld_this, "module_make_corrmaps.R"))
 
 ui <- fluidPage(
   titlePanel("Human Mortality Database Explorer"),
   
   sidebarLayout(
     sidebarPanel(
-      select_data_ui("data_module1_singular"),
-      
-      verbatimTextOutput("tab_active")
+
+        select_data_ui("data_module1_singular"),
+        verbatimTextOutput("tab_active")
+    
       
     ),
     
