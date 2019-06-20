@@ -39,10 +39,10 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
+      verbatimTextOutput("tab_active"),
+      
 
-        select_data_ui("data_module1_singular"),
-        verbatimTextOutput("tab_active")
-    
+      uiOutput("sidebar_select")
       
     ),
     
@@ -72,6 +72,23 @@ ui <- fluidPage(
 
 server <- function(input, output) {
   get_active_tab <- reactive({input$main_tabset})
+  
+  output$sidebar_select <- renderUI({
+
+    switch(get_active_tab(),
+           "Individual Population"            = select_data_ui("data_module1_singular"),
+           "Group of Populations"             = select_data_ui("data_module1_singular", allow_multiple = TRUE),
+           "Comparison between Genders"       = select_data_ui("data_module1_singular", select_sex = FALSE),
+           "Comparison between Populations"   = tagList(
+             select_data_ui("data_module1_singular"),
+             select_data_ui("data_module2_singular")
+            ),
+           "Correlation in trends by age"     = select_data_ui("data_module1_singular")
+    )
+    
+  })
+  
+  
   
   data1_singular <- callModule(select_data_server, "data_module1_singular")
 

@@ -1,43 +1,56 @@
 
 #### MODULE
 
-select_data_ui <- function(id){
+select_data_ui <- function(id, allow_multiple = FALSE, select_sex = TRUE){
   ns <- NS(id)
   
-  
-  tagList(
-    selectInput(ns("code_select"),
-                "Select country of interest",
-                choices = codes_named,
-                selected = "GBR_SCO",
-                multiple = FALSE),
-    
-    selectInput(ns("sex_select"),
+  sex_select_element <- selectInput(ns("sex_select"),
                 "Select sex of interest",
-                choices = c("Male", "Female","Total")),
-    
-    selectInput(ns("output_type"),
-                "Select output of interest",
-                choices = c("Mx", "Dx", "e0"),
-                selected = "Mx"),
-    
-    checkboxInput(ns("snap_period"),
-                  "Check to snap years to range available",
-                  value = FALSE),
+                choices = c("Total", "Male", "Female"))
   
-    uiOutput(ns("dynamic_year_slider")),
+#  browser()
     
+    pt1 <- list(
+      selectInput(ns("code_select"),
+                  "Select country of interest",
+                  choices = codes_named,
+                  selected = "GBR_SCO",
+                  multiple = allow_multiple),
+      
+      selectInput(ns("output_type"),
+                  "Select output of interest",
+                  choices = c("Mx", "Dx", "e0"),
+                  selected = "Mx")
+    )
     
-    sliderInput(ns("age_limits"), sep = "",
-                "Select range of ages",
-                min = 0, max = 110, step = 1, 
-                value = c(0, 90)),  
+    pt2 <- list(
+      
+      checkboxInput(ns("snap_period"),
+                    "Check to snap years to range available",
+                    value = FALSE),
+      
+      uiOutput(ns("dynamic_year_slider")),
+      
+      
+      sliderInput(ns("age_limits"), sep = "",
+                  "Select range of ages",
+                  min = 0, max = 110, step = 1, 
+                  value = c(0, 90)),  
+      
+      actionButton(ns("confirm_selection"),
+                   "Load Data"
+      )
+      
+      
+    )
+    output <- if(select_sex){
+      tagList(pt1, sex_select_element, pt2)
+    } else {
+      tagList(pt1, pt2)
+    }
     
-    actionButton(ns("confirm_selection"),
-                 "Load Data"
-    ),
-    
-    verbatimTextOutput(ns("minmaxyear"))
+    return(output)
+#    verbatimTextOutput(ns("minmaxyear"))
     # textOutput(ns("country_selected")),
     # textOutput(ns("sex_selected")),
     # textOutput(ns("years_selected")),
@@ -46,7 +59,7 @@ select_data_ui <- function(id){
     # 
     # tableOutput(ns("data_head_selected"))
     
-  )
+#  )
 }
 
 select_data_server <- function(input, output, session){
