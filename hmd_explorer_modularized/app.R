@@ -90,15 +90,16 @@ server <- function(input, output) {
   
   
   
+  data1_sexcompare <- callModule(select_data_server, "data_module1_singular", mode = "sex-compare")
   data1_singular <- callModule(select_data_server, "data_module1_singular")
-
+  data2_singular <- callModule(select_data_server, "data_module2_singular")
   
   callModule(make_graphics_server, "graphics_module_singular-singular", 
              mode = "singular-singular", data = data1_singular)
   callModule(make_graphics_server, "graphics_module_group-singular", 
              mode = "group-singular", data = data1_singular)
   callModule(make_graphics_server, "graphics_module_singular-comparative", 
-             mode = "singular-comparative", data = data1_singular)
+             mode = "sex-compare", data = data1_sexcompare)
   callModule(make_graphics_server, "graphics_module_group-comparative", 
              mode = "group-comparative", data = data1_singular)
   

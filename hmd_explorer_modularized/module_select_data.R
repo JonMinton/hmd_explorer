@@ -62,11 +62,15 @@ select_data_ui <- function(id, allow_multiple = FALSE, select_sex = TRUE){
 #  )
 }
 
-select_data_server <- function(input, output, session){
+select_data_server <- function(input, output, session, mode = "standard"){
+  # options for mode should be:
+  # # standard      : one or more populations 
+  # # sex-compare   : males cf females in same country 
+
   ns <- session$ns
   
   # Work out min and max year for the data 
-  get_minmaxyear <- function(full_data = "data/hmd_data.csv"){
+  get_minmaxyear <- function(full_data = file.path(fld_data, "hmd_data.csv")){
     data <- read_csv(full_data)
     names(data) <- tolower(names(data))
     
@@ -87,9 +91,18 @@ select_data_server <- function(input, output, session){
     
     output <- dta %>%
       filter(code %in% country_selected()) %>%
-      filter(gender %in% sex_selected()) %>%
       filter(between(age, ages_selected()[1], ages_selected()[2])) %>%
-      filter(between(year, years_selected()[1], years_selected()[2]))
+      filter(between(year, years_selected()[1], years_selected()[2])) 
+    
+    if (mode == "sex_compare")  
+      output <- output %>% 
+        filter(gender %in% c("Male", "Female")) %>% 
+        group_by(gender) %>% 
+        nest()
+      
+    else {
+      output <- output %>% filter(gender %in% sex_selected())
+    }
     
     return(output)
   }
