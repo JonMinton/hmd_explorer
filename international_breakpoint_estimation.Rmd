@@ -1,0 +1,228 @@
+---
+title: "International breakpoint analysis"
+output: html_notebook
+---
+
+The aim of this is to *quickly* test the following claim made by Gerry in a recent presentation:
+
+`Mortality trend change is real and substantial. Scotland, England & Wales, USA worst affected. Other countries not affected at all. `
+
+My sense from looking at international data is that the first part of the claim might be true, but the latter part is not, and instead the stalling has been international.
+
+However I've not yet done a segmented regression/breakpoint analysis of international life expectancy data to (dis)confirm this. This document aims to quickly perform this analysis and work out if there has been a similar breakpoint in many/most HMD countries.
+
+
+```{r}
+rm(list = ls())
+
+pacman::p_load(
+  tidyverse, 
+  plotly,
+  HMDHFDplus,
+  segmented
+)
+
+```
+
+
+```{r}
+baseloc <- "N:/Jon/hmd_data/hmd_countries/"
+
+codes <- dir(baseloc)
+
+hmd_e0 <- data_frame(
+  code = codes
+) %>% 
+  mutate(
+    e0 = map(
+      code,
+      function(x) {
+        read_table(
+          file.path(
+            baseloc, x, "STATS/e0per.txt"
+          ),
+          skip = 2,
+          col_types = "iddd"
+          
+        )
+      }
+    )
+  ) %>% 
+  unnest() %>% 
+  gather(key = "gender", value = "e0", Female:Total)
+```
+
+
+Let's look at 1990 onwards.
+
+```{r}
+
+modblock <- hmd_e0 %>% 
+  filter(Year >= 1990) %>% 
+  filter(gender != "Total") %>% 
+  group_by(code, gender) %>% 
+  nest() 
+
+n_models <- dim(modblock)[1]
+
+modblock <- modblock %>% 
+  mutate(mod_results = vector("list", length = n_models))
+
+for (i in 1:n_models){
+  this_data <- modblock$data[[i]]
+  this_lm <- lm(e0 ~ Year, data = this_data)
+  
+  this_seg <- try(
+    segmented(this_lm, seg_rate.z = ~Year, psi = NA, control = seg.control(K=1, stop.if.error = F)),
+    TRUE
+  )
+  
+  modblock$mod_results[[i]] <- this_seg
+}
+
+
+```
+
+Now, for those datasets where a breakpoint can be identified, let's pull these out 
+
+
+```{r}
+
+get_psi <- function(identified, mod_results){
+  if(!identified){
+    return(NA_real_)
+  } 
+  return(mod_results$psi[,"Est."])
+}
+
+get_se <- function(identified, mod_results){
+  if(!identified){
+    return(NA_real_)
+  } 
+  return(mod_results$psi[,"St.Err"])
+}
+
+
+modblock_results <- modblock %>% 
+  mutate(is_identified = map_lgl(mod_results, ~class(.x)[1] != 'try-error')) %>% 
+  mutate(seg_break = map2_dbl(
+    is_identified, mod_results,
+    get_psi
+    )
+  ) %>% 
+  mutate(seg_se = map2_dbl(
+    is_identified, mod_results,
+    get_se
+  )) %>% 
+  select(code, gender, seg_break, seg_se)
+
+```
+
+And now to visualise
+
+```{r}
+modblock_results %>% 
+  ggplot(aes(y = code)) + 
+  geom_point(aes(x = seg_break)) +
+  geom_errorbarh(aes(xmin = seg_break - 2 * seg_se, xmax = seg_break + 2 * seg_se)) + 
+  facet_wrap(~gender)
+
+```
+
+ Now what if I attempt a 2 break point version? 
+ 
+ 
+```{r}
+
+modblock2 <- hmd_e0 %>% 
+  filter(Year >= 1985) %>% 
+  filter(gender != "Total") %>% 
+  group_by(code, gender) %>% 
+  nest() 
+
+n_models <- dim(modblock2)[1]
+
+modblock2 <- modblock2 %>% 
+  mutate(mod_results = vector("list", length = n_models))
+
+for (i in 1:n_models){
+  this_data <- modblock2$data[[i]]
+  this_lm <- lm(e0 ~ Year, data = this_data)
+  
+  this_seg <- try(
+    segmented(this_lm, seg_rate.z = ~Year, psi = NA, control = seg.control(K=2, stop.if.error = F)), # note K=2
+    TRUE
+  )
+  
+  modblock2$mod_results[[i]] <- this_seg
+}
+
+
+```
+ 
+```{r}
+
+get_psi <- function(identified, mod_results){
+  if(!identified){
+    return(NA_real_)
+  } 
+  return(mod_results$psi[1,"Est."])
+}
+
+get_se <- function(identified, mod_results){
+  if(!identified){
+    return(NA_real_)
+  } 
+  return(mod_results$psi[1,"St.Err"])
+}
+
+get_psi2 <- function(identified, mod_results){
+  if(!identified){
+    return(NA_real_)
+  } 
+  return(mod_results$psi[2,"Est."])
+}
+
+get_se2 <- function(identified, mod_results){
+  if(!identified){
+    return(NA_real_)
+  } 
+  return(mod_results$psi[2,"St.Err"])
+}
+
+
+modblock2_results <- modblock2 %>% 
+  mutate(is_identified = map_lgl(mod_results, ~class(.x)[1] != 'try-error')) %>% 
+  mutate(
+    seg_break = map2_dbl(is_identified, mod_results, get_psi),
+    seg_break2 = map2_dbl(is_identified, mod_results, get_psi2)
+  ) %>% 
+  mutate(
+    seg_se = map2_dbl(is_identified, mod_results,get_se),
+    seg_se2 = map2_dbl(is_identified, mod_results,get_se2),
+         ) %>% 
+  select(code, gender, seg_break, seg_se, seg_break2, seg_se2)
+
+```
+
+And now to visualise this 
+
+
+```{r}
+#order by seg_break2 for females 
+
+reordered_codes <- modblock2_results %>% 
+  filter(gender == "Female") %>% 
+  mutate(code = fct_reorder(code, seg_break2)) %>% 
+  pull(code)
+
+modblock2_results %>% 
+#  mutate(code = factor(code, levels = levels(reordered_codes))) %>% 
+  ggplot(aes(y = code)) + 
+  geom_point(aes(x = seg_break), colour = "blue") +
+  geom_errorbarh(aes(xmin = seg_break - 2 * seg_se, xmax = seg_break + 2 * seg_se), colour = "blue") + 
+    geom_point(aes(x = seg_break2), colour = "red") +
+  geom_errorbarh(aes(xmin = seg_break2 - 2 * seg_se2, xmax = seg_break2 + 2 * seg_se2), colour = "red") + 
+  facet_wrap(~gender)
+
+```

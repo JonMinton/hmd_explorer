@@ -1,7 +1,14 @@
 ---
 title: "Mort against Mort Change Comparer"
-output: html_notebook
+output:
+  word_document: default
+  html_document:
+    df_print: paged
 ---
+# Abstract 
+
+Every few years, the claim is made that a maximum human lifespan has been identified. [REFS] And as more of the population reaches this hypothetical limit, so the number of people 
+
 # Aim
 
 The aim of this is to compare mortality against change in mortality for a number of countries.
@@ -17,14 +24,14 @@ pacman::p_load(
 
 Now, how do I grab life expectancies only for each country? 
 
-```{r}
-# username <- "jon.will.minton@gmail.com"
-# password <- "passphrase"
-# 
-# hmd_dta <- data_frame(
-#   code = getHMDcountries()
-# ) %>% 
-#   mutate(deaths = map(code, readHMDweb, item = "e0per", username = username, password = password))
+```{r, eval = FALSE}
+username <- "jon.will.minton@gmail.com"
+password <- "passphrase"
+
+hmd_dta <- data_frame(
+  code = getHMDcountries()
+) %>%
+  mutate(deaths = map(code, readHMDweb, item = "e0per", username = username, password = password))
 
 
 ```
@@ -156,4 +163,299 @@ ggsave("sc.png", height = 30, width = 20, units = "cm", dpi = 300)
 
 ```
 
+# Modelling
 
+After having shown the intuition, the next stage is to model the relationship between delta(e0) and e0 for all available countries
+
+```{r}
+tmp %>% 
+  filter(gender == "Female") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0 + code, data = .) %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term = str_replace(term, "code", "")) %>% 
+  mutate(term = fct_reorder(term, estimate)) %>% 
+  mutate(term = fct_relevel(term, "delta_e0", after = Inf)) %>% 
+  ggplot() + 
+  geom_point(aes(x = estimate, y= term)) + 
+  geom_segment(aes(x = estimate - 1.96 * std.error, xend = estimate + 1.96 * std.error, y = term, yend = term)) + 
+  geom_vline(xintercept = 0) + 
+  labs(title = "Predictors of e0 for females")
+
+```
+
+
+```{r}
+tmp %>% 
+  filter(gender == "Male") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0 + code, data = .) %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term = str_replace(term, "code", "")) %>% 
+  mutate(term = fct_reorder(term, estimate)) %>% 
+  mutate(term = fct_relevel(term, "delta_e0", after = Inf)) %>% 
+  ggplot() + 
+  geom_point(aes(x = estimate, y= term)) + 
+  geom_segment(aes(x = estimate - 1.96 * std.error, xend = estimate + 1.96 * std.error, y = term, yend = term)) + 
+  geom_vline(xintercept = 0) + 
+  labs(title = "Predictors of e0 for Males")
+
+```
+
+And now for both, given the range is much greater for males than females. 
+
+```{r}
+results_females <- tmp %>% 
+  filter(gender == "Female") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0 + code, data = .) %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term = str_replace(term, "code", "")) %>% 
+  mutate(sex = "Female") %>%
+  mutate(term = fct_reorder(term, estimate)) %>% 
+  mutate(term = fct_relevel(term, "delta_e0", after = Inf))
+
+results_males <- tmp %>% 
+  filter(gender == "Male") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0 + code, data = .) %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term = str_replace(term, "code", "")) %>% 
+  mutate(sex = "Male")
+
+results_males$term <- factor(results_males$term, levels = levels(results_females$term))
+
+results_both <- results_females %>% 
+  bind_rows(results_males)
+
+
+```
+
+And now to visualise 
+
+
+```{r}
+results_both %>% 
+  ggplot(aes(group = sex)) + 
+  geom_point(aes(x = estimate, y= term)) + 
+  geom_segment(aes(x = estimate - 1.96 * std.error, xend = estimate + 1.96 * std.error, y = term, yend = term)) + 
+  geom_vline(xintercept = 0) + 
+  labs(title = "Predictors of e0 by gender") + 
+  facet_wrap(~sex)
+
+```
+
+However, what's presented above is the result of a 'level 2' model. The simplest, 'level 1' model, would be one that simply regresses e0 on delta_e0 and nothing else. What does this show?
+
+```{r}
+results_females <- tmp %>% 
+  filter(gender == "Female") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0, data = .) %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term = str_replace(term, "code", "")) %>% 
+  mutate(sex = "Female") %>%
+  mutate(term = fct_reorder(term, estimate)) %>% 
+  mutate(term = fct_relevel(term, "delta_e0", after = Inf))
+
+results_males <- tmp %>% 
+  filter(gender == "Male") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0, data = .) %>% 
+  summary() %>% 
+  broom::tidy() %>% 
+  filter(term != "(Intercept)") %>% 
+  mutate(term = str_replace(term, "code", "")) %>% 
+  mutate(sex = "Male")
+
+results_males$term <- factor(results_males$term, levels = levels(results_females$term))
+
+results_both <- results_females %>% 
+  bind_rows(results_males)
+
+results_both %>% 
+  ggplot(aes(group = sex)) + 
+  geom_point(aes(x = estimate, y= term)) + 
+  geom_segment(aes(x = estimate - 1.96 * std.error, xend = estimate + 1.96 * std.error, y = term, yend = term)) + 
+  geom_vline(xintercept = 0) + 
+  labs(title = "Predictors of e0 by gender") + 
+  facet_wrap(~sex)
+
+
+```
+
+So, this changes the coefficient for delta_e0, for females, from not statistically significant, to statistically significant, but perhaps what's more important to establish is whether the country codes should be included in terms of improvement to model fit. This question can be answered using ANOVA, as the second model is nested in the first model.
+
+i.e. the model without the country fixed effects is the *unrestricted model*, and the model with the country fixed effects is the *restricted model*. 
+
+```{r}
+model_restricted_f <- tmp %>% 
+  filter(gender == "Female") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0, data = .)
+
+model_restricted_m <- tmp %>% 
+  filter(gender == "Male") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0, data = .)
+
+model_unrestricted_f <- tmp %>% 
+  filter(gender == "Female") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0 + code, data = .)
+
+model_unrestricted_m <- tmp %>% 
+  filter(gender == "Male") %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  lm(e0 ~ delta_e0 + code, data = .)
+
+# Test for females
+anova(model_restricted_f, model_unrestricted_f)
+
+# Test for males
+anova(model_restricted_m, model_unrestricted_m)
+
+
+
+```
+
+As expected, the ANOVA tests suggest the unrestricted model variants are justified by the better model fit for both genders (especially males).
+
+
+We can extend the approach of model comparison to see if adding a post 2010 dummy term is justified
+
+```{r}
+tmp %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  mutate(is_after_2010 = Year >= 2010) %>% 
+  group_by(gender) %>% 
+  nest() %>% 
+  mutate(
+    mod_01 = map(data, ~lm(e0 ~ delta_e0, data = .x)),
+    mod_02 = map(data, ~lm(e0 ~ delta_e0 + code, data = .x)),
+    mod_03 = map(data, ~lm(e0 ~ delta_e0 + code + is_after_2010, data = .x)),
+    mod_04 = map(data, ~lm(e0 ~ delta_e0 + is_after_2010, data = .x))
+    ) %>% 
+  select(-data) %>% 
+  gather(key = "mod_label", value = "model", -gender) %>%
+  mutate(
+    aic = map_dbl(model, AIC), 
+    bic = map_dbl(model, BIC)
+  ) %>% 
+  group_by(gender) %>% 
+  mutate(fit_rank_a = rank(aic)) %>% 
+  mutate(fit_rank_b = rank(bic)) %>% 
+  ungroup() %>% 
+  arrange(gender, fit_rank_a)
+
+```
+
+Let's now extend this kind of approach to other decadal periods 
+
+
+```{r}
+
+timeblock_models <- tmp %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>%
+  mutate(is_1980s = Year >= 1980 & Year <= 1989) %>% 
+  mutate(is_1990s = Year >= 1990 & Year <= 1999) %>% 
+  mutate(is_2000s = Year >= 2000 & Year <= 2009) %>% 
+  mutate(is_after_2010 = Year >= 2010) %>% 
+  group_by(gender) %>% 
+  nest() %>% 
+  mutate(
+    mod_base = map(data, ~lm(e0 ~ delta_e0 + code, data = .x)),
+    mod_2010s = map(data, ~lm(e0 ~ delta_e0 + code + is_after_2010, data = .x)),
+    mod_2000s = map(data, ~lm(e0 ~ delta_e0 + code + is_2000s, data = .x)),
+    mod_1990s = map(data, ~lm(e0 ~ delta_e0 + code + is_1990s, data = .x)),
+    mod_1980s = map(data, ~lm(e0 ~ delta_e0 + code + is_1980s, data = .x)),
+    mod_each  = map(data, ~lm(e0 ~ delta_e0 + code + is_1980s + is_1990s + is_2000s + is_after_2010, data = .x))
+    ) %>% 
+  select(-data) %>% 
+  gather(key = "mod_label", value = "model", -gender) %>%
+  mutate(
+    aic = map_dbl(model, AIC), 
+    bic = map_dbl(model, BIC)
+  ) %>% 
+  group_by(gender) %>% 
+  mutate(fit_rank_a = rank(aic)) %>% 
+  mutate(fit_rank_b = rank(bic)) %>% 
+  ungroup() %>% 
+  arrange(gender, fit_rank_a) 
+
+timeblock_models
+
+timeblock_models %>% 
+  ggplot(aes(y = mod_label, colour = gender, group = gender)) + 
+  geom_point(aes(x = aic), shape = 1) + geom_point(aes(x = bic), shape = 2)
+
+```
+
+Generally, the models with newer dummy terms outperformed those with older dummy terms, though for males the 1980s dummy model outperformed the 1990s dummy model, perhaps because more happened during the 1980s than 1990s which impacted male longevity trends more than female longevity trends. The model with decade-specific terms for each decade other than the 1970s (which would be underidentified) performs best of all. 
+
+## Digression: reminding myself of the algebra and intuition of an asymptote
+
+The improved fit with time suggests that maybe it would also be worth comparing a model with delta_e0 with delta_e0 squared, as the relationship might be best characterised as nonlinear rather than linear. To think through whether this should be the case when appraoching an asymptote, I should first produce a simple example of an asymptote 
+
+
+```{r}
+x <- 0:10000 / 1000
+K <- 80
+vals <- K - (1 / K + exp(-x))
+
+df <- data_frame(
+  x = x,
+  val = vals,
+  delta_val = val - lag(val)
+) 
+
+ggplot(aes(x = x, y = val), data = df) + 
+  geom_line()
+
+ggplot(aes(x = val, y = delta_val), data = df) +
+  geom_line()
+
+```
+
+This (of course) demonstrates through example something readily provable analytically: if life expectancy were approaching an asymptote then the coefficient of val ~ delta_val will be a negative and nonlinear. 
+
+Given this, I'm not sure of the value of additionally adding a nonlinear term, as it doesn't seem to be testing any kind of clear hypothesis. (Whereas regressing e0 on delta_e0 clearly is)
+
+**End of Digression!**
+
+
+**Thinking again: it doesn't quite make sense to add many time block factors together as this is controlling for something that should be inherent in the main model structure.**
+
+However, I could simply show the correlation for each country 
+
+```{r}
+tmp %>% 
+  filter(!code %in% c("DEUTNP", "FRACNP", "GBRCENW", "GBR_NP", "NZL_NM", "NZL_MA")) %>% 
+  group_by(code, gender) %>% 
+  nest() %>% 
+  mutate(pearson = map_dbl(data, ~cor(.x$e0, .x$delta_e0)),
+         spearman = map_dbl(data, ~cor(.x$e0, .x$delta_e0, method = "spearman"))) %>%
+  gather(pearson:spearman, key = "correl_type", value = "correl_value") %>% 
+  ggplot() +
+  geom_point(aes(x = correl_value, y = code, colour = gender, shape = correl_type)) + 
+  geom_vline(xintercept = 0, size = 1.2) + 
+  geom_vline(aes(xintercept = mean(correl_value[correl_type == "pearson" & gender == "Female"]))) + 
+  geom_vline(aes(xintercept = mean(correl_value[correl_type == "pearson" & gender == "Male"])))  +
+  geom_vline(aes(xintercept = mean(correl_value[correl_type == "spearman" & gender == "Female"])))  +
+  geom_vline(aes(xintercept = mean(correl_value[correl_type == "spearman" & gender == "Male"])))  
+  
+  
+
+``` 
+
+This clearly seems to show that there is no clear relationship internationally between life expectancy and change in life expectancy, and that the average correlation is around 0, or slightly positive. (around 0.1)
