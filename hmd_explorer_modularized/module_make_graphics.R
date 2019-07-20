@@ -1,4 +1,33 @@
 
+define_colbrew_pals <- function(category, colorblind){
+  out <- RColorBrewer %>% 
+    as_tibble(rownames = "pal_name") 
+  
+  if (!is.null(category)) {
+    out <- out %>% filter(category == category)
+  }
+  if (!is.null(colorblind)) {
+    out <- out %>% filter(colorblind == colorblind)
+  }
+  
+  out
+}
+
+all_colbrew_pals <- brewer.pal.info %>% 
+  as_tibble(rownames = "pal_name") %>% 
+  pull(pal_name) %>% 
+  str_c("RColorBrewer", ":", .)
+
+create_colbrew_ramp <- function(palname){
+  browser()
+  max_n <- brewer.pal.info %>% 
+    as_tibble(rownames = "pal_name") %>% 
+    filter(pal_name == palname) %>% 
+    pull(maxcolors)
+  
+  colorRampPalette(brewer.pal(name = palname, n = max_n))
+}
+
 make_graphics_ui <- function(id){
   ns <- NS(id)
   
@@ -18,7 +47,8 @@ make_graphics_ui <- function(id){
         "Viridis:magma", 
         "Viridis:plasma",
         "Viridis:inferno",
-        "Viridis:cividis"
+        "Viridis:cividis",
+        all_colbrew_pals
         )
       ),
     checkboxInput(ns("add_continuity"), value = FALSE,
@@ -63,7 +93,33 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
       correction <- 0
     }
     
-    data <- data()
+
+    if (mode == 'sex-compare'){
+      data <- data() %>% 
+        filter(gender != "Total") %>% 
+        group_by(year, age) %>% 
+        summarise(
+          num_deaths = num_deaths[gender == "Male"] - num_deaths[gender == "Female"],
+          num_population = num_population[gender == "Male"] - num_population[gender == "Female"],
+          exposure = exposure[gender == "Male"] - exposure[gender == "Female"]
+        ) %>% 
+        ungroup()
+
+    } else {
+      data <- data() %>% 
+        group_by(year, age, gender) %>% 
+        summarise(
+          num_deaths     = sum(num_deaths,     na.rm = TRUE),
+          num_population = sum(num_population, na.rm = TRUE),
+          exposure       = sum(exposure,       na.rm = TRUE)
+        ) %>% 
+        ungroup()
+
+    }
+    
+    
+    
+
 
     output <- if (outcome == "Log mortality"){
       data %>% 
@@ -107,9 +163,12 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
       ggplot(aes(x = year, y = age, fill = z_var)) + 
       geom_tile()
     
-    if (colscheme_tidied["Family"] == "Viridis"){
+    if (colscheme_tidied[["Family"]] == "Viridis"){
       p <- p +
         scale_fill_viridis_c(option = colscheme_tidied["pal"])
+    } else if (colscheme_tidied[["Family"]] == "RColorBrewer"){
+    p <- p + 
+      scale_fill_distiller(palette = colscheme_tidied["pal"])
     }
     
     p
@@ -128,9 +187,14 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
           hue_posn,
           viridis_pal(option = colscheme_tidied["pal"])(20)                
       )
-    } else {
+    } else if (colscheme_tidied[["Family"]] == "RColorBrewer"){
       
-      # DO FOR OTHER PALETTES HERE
+      hue_posn <- seq(0, 1, length = 20)
+      colscale_list <- list(
+        hue_posn,
+        create_colbrew_ramp(colscheme_tidied["pal"])(20)
+        
+      )
     }
     
     
@@ -149,11 +213,23 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
     
     data_mtrx <- make_z_list(data)
 
-    
+        
     n_ages  <-  length(data_mtrx[["age"]]  )
     n_years <-  length(data_mtrx[["year"]] )
     
     if (devicetype == "plotly:lexis"){
+
+      
+      validate(
+        need(
+          and(
+            data_mtrx[["vals"]] %>% is.finite() %>% `!` %>% any() %>% `!`,
+            selected_add_continuity()            
+          ),
+          "Add a continuity correction"
+        )
+      )
+      
       p <- plot_ly(z = ~t(data_mtrx[["vals"]]), 
                    x = ~data_mtrx[["year"]],
                    y = ~data_mtrx[["age"]]
@@ -168,7 +244,17 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
         )
       
     } else if (devicetype == "plotly:3d_surface"){
-
+      
+      validate(
+        need(
+          and(
+            data_mtrx[["vals"]] %>% is.finite() %>% `!` %>% any() %>% `!`,
+            selected_add_continuity()            
+          ),
+          "Add a continuity correction"
+        )
+      )
+      
       
       p <- plot_ly(z = ~data_mtrx[["vals"]], 
                    y = ~data_mtrx[["year"]],

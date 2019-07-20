@@ -8,7 +8,6 @@ select_data_ui <- function(id, allow_multiple = FALSE, select_sex = TRUE){
                 "Select sex of interest",
                 choices = c("Total", "Male", "Female"))
   
-#  browser()
     
     pt1 <- list(
       selectInput(ns("code_select"),
@@ -94,27 +93,31 @@ select_data_server <- function(input, output, session, mode = "standard"){
       filter(between(age, ages_selected()[1], ages_selected()[2])) %>%
       filter(between(year, years_selected()[1], years_selected()[2])) 
     
-    if (mode == "sex_compare")  
+    
+    if (mode == "sex-compare")  {
       output <- output %>% 
         filter(gender %in% c("Male", "Female")) %>% 
         group_by(gender) %>% 
         nest()
-      
-    else {
+
+    } else {
       output <- output %>% filter(gender %in% sex_selected())
+
     }
+    
+
     
     return(output)
   }
   
   
   # reactive events
-  country_selected     <- reactive(                              {input$code_select   })
-  period_snap_selected <- reactive(                              {input$snap_period   })
-  
+  country_selected     <- eventReactive(input$confirm_selection, {input$code_select   })
+  period_snap_selected <- eventReactive(input$confirm_selection, {input$snap_period   })
   sex_selected         <- eventReactive(input$confirm_selection, {input$sex_select    })
   ages_selected        <- eventReactive(input$confirm_selection, {input$age_limits    })
   output_selected      <- eventReactive(input$confirm_selection, {input$output_type   })
+  years_selected       <- eventReactive(input$confirm_selection, {input$period_limits })
   
   # Functions 
   data_subset_selected <- eventReactive(input$confirm_selection, {load_subset()       })
@@ -138,7 +141,7 @@ select_data_server <- function(input, output, session, mode = "standard"){
     }
   })
   
-  years_selected       <- eventReactive(input$confirm_selection, {input$period_limits })
+
   
   # 
   # 
