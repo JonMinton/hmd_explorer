@@ -1,35 +1,8 @@
 
-define_colbrew_pals <- function(category, colorblind){
-  out <- RColorBrewer %>% 
-    as_tibble(rownames = "pal_name") 
-  
-  if (!is.null(category)) {
-    out <- out %>% filter(category == category)
-  }
-  if (!is.null(colorblind)) {
-    out <- out %>% filter(colorblind == colorblind)
-  }
-  
-  out
-}
-
-all_colbrew_pals <- brewer.pal.info %>% 
-  as_tibble(rownames = "pal_name") %>% 
-  pull(pal_name) %>% 
-  str_c("RColorBrewer", ":", .)
-
-create_colbrew_ramp <- function(palname){
-  browser()
-  max_n <- brewer.pal.info %>% 
-    as_tibble(rownames = "pal_name") %>% 
-    filter(pal_name == palname) %>% 
-    pull(maxcolors)
-  
-  colorRampPalette(brewer.pal(name = palname, n = max_n))
-}
 
 make_graphics_ui <- function(id){
   ns <- NS(id)
+  cat(file=stderr(), "make_graphics_ui()\n")
   
   
   tagList(
@@ -51,6 +24,8 @@ make_graphics_ui <- function(id){
         all_colbrew_pals
         )
       ),
+    checkboxInput(ns("reverse_pal_direction"), value = FALSE,
+                  label = "Check to reverse palette_direction"),
     checkboxInput(ns("add_continuity"), value = FALSE,
                 label = "Check to add continuity correction"
       ),
@@ -63,6 +38,7 @@ make_graphics_ui <- function(id){
                   `plotly:3D surface` = "plotly:3d_surface"
                 )
     ),
+    actionButton(ns("plot_graphs"), label = "Click to plot graph"),
     
     
     
@@ -82,13 +58,14 @@ make_graphics_ui <- function(id){
 
 make_graphics_server <- function(input, output, session, mode = "singular-singular", data){
   ns <- session$ns
+  cat(file=stderr(), "make_graphics_server()\n")
   
   # Internal functions
-
   
   # Given the specified outcome, produce a table with age, year and the outcome
   derive_outcome <- function(data, outcome, correction){
-
+    cat(file=stderr(), "make_graphics_server::derive_outcome()\n")
+    
     if (is.null(correction)){
       correction <- 0
     }
@@ -149,6 +126,7 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
   }
   
   produce_surface_ggplot <- function(data, colscheme, devicetype){
+    cat(file=stderr(), "make_graphics_server::produce_surface_ggplot()\n")
     
     colscheme_tidied  <- colscheme %>% 
       str_split(":") %>% 
@@ -165,40 +143,57 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
     
     if (colscheme_tidied[["Family"]] == "Viridis"){
       p <- p +
-        scale_fill_viridis_c(option = colscheme_tidied["pal"])
+        scale_fill_viridis_c(option = colscheme_tidied["pal"],
+                             direction = ifelse(selected_pal_reverse(), -1, 1)
+        )
     } else if (colscheme_tidied[["Family"]] == "RColorBrewer"){
     p <- p + 
-      scale_fill_distiller(palette = colscheme_tidied["pal"])
+      scale_fill_distiller(palette = colscheme_tidied["pal"],
+                           direction = ifelse(selected_pal_reverse(), -1, 1)
+      )
     }
     
     p
   }
   
   produce_surface_plotly <- function(data, colscheme, devicetype){
+    cat(file=stderr(), "make_graphics_server::produce_surface_plotly()\n")
     
     colscheme_tidied  <- colscheme %>% 
       str_split(":") %>% 
       pluck(1) %>% 
       setNames(c("Family", "pal"))
+
+    cat(file=stderr(), "selected_pal_reverse(): ", selected_pal_reverse(), "\n")
     
     if (colscheme_tidied["Family"] == "Viridis") {
-      hue_posn <- seq(0, 1, length = 20)
+      
+      hue_posn <- seq(0, 1, length.out = 20)
       colscale_list <- list(
           hue_posn,
-          viridis_pal(option = colscheme_tidied["pal"])(20)                
+          viridis_pal(
+            option = colscheme_tidied["pal"],
+            direction = ifelse(selected_pal_reverse(),-1, 1)
+            )(20)
       )
     } else if (colscheme_tidied[["Family"]] == "RColorBrewer"){
       
-      hue_posn <- seq(0, 1, length = 20)
+      cols <- create_colbrew_ramp(colscheme_tidied["pal"])(20)
+      if (selected_pal_reverse()) {cols <- rev(cols)}
+      
+      hue_posn <- seq(0, 1, length.out = 20)
       colscale_list <- list(
         hue_posn,
-        create_colbrew_ramp(colscheme_tidied["pal"])(20)
-        
+        cols
       )
     }
     
     
+    
+    
     make_z_list <- function(X) {
+      cat(file=stderr(), "make_graphics_server::make_z_list()\n")
+      
       # adjust: amount to add to numerator and denominator
       # k: base to use if logging
       tmp <- X %>%
@@ -282,12 +277,13 @@ make_graphics_server <- function(input, output, session, mode = "singular-singul
   
 
   # reactive events
-  selected_outcome          <- reactive({input$select_outcome        })
-  selected_colourscheme     <- reactive({input$select_colourscheme   })
-  selected_devicevis        <- reactive({input$select_devicevis      })
-  selected_add_continuity   <- reactive({input$add_continuity        })
-  selected_continuityvalue  <- reactive({input$continuity_value      })
+  selected_outcome          <- eventReactive(input$plot_graphs, {input$select_outcome        })
+  selected_colourscheme     <- eventReactive(input$plot_graphs, {input$select_colourscheme   })
+  selected_devicevis        <- eventReactive(input$plot_graphs, {input$select_devicevis      })
   
+  selected_add_continuity   <- eventReactive(input$plot_graphs, {input$add_continuity        })
+  selected_continuityvalue  <- eventReactive(input$plot_graphs, {input$continuity_value      })
+  selected_pal_reverse      <- eventReactive(input$plot_graphs, {input$reverse_pal_direction })
   
   output$dynamic_continuity <- renderUI({
     if (!selected_add_continuity()){

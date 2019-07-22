@@ -1,6 +1,6 @@
 make_corrmaps_ui <- function(id){
   ns <- NS(id)
-  
+  cat(file=stderr(), "make_corrmaps_ui\n")
   tagList(
     # INPUTS
     selectInput(ns("select_corrtype"),
@@ -59,6 +59,7 @@ make_corrmaps_ui <- function(id){
 
 make_corrmaps_server <- function(input, output, session, data, mode){
   ns <- session$ns
+  cat(file=stderr(), "make_corrmaps_server\n")
   
 
   
@@ -72,6 +73,7 @@ make_corrmaps_server <- function(input, output, session, data, mode){
   selected_scalelimits      <- reactive({input$corr_scalelimits      })
   
   calc_corrdata <- function(data, corrtype, correction, mode= "ggplot"){
+    cat(file=stderr(), "make_corrmaps_server::calc_corrdata\n")
     
     data <- data()
     
@@ -106,6 +108,7 @@ make_corrmaps_server <- function(input, output, session, data, mode){
   }
   
   calc_twoage_data <- function(data, first_age, second_age, correction){
+    cat(file=stderr(), "make_corrmaps_server::calc_twoage_data()\n")
     
     if(is.null(correction)){
       correction <- 0
@@ -133,6 +136,7 @@ make_corrmaps_server <- function(input, output, session, data, mode){
   
   
   plot_corrmap <- function(data, colscheme, scalelimit){
+    cat(file=stderr(), "make_corrmaps_server::plot_corrmap()\n")
     
     colscheme_tidied  <- colscheme %>% 
       str_split(":") %>% 
@@ -164,6 +168,7 @@ make_corrmaps_server <- function(input, output, session, data, mode){
   }
   
   plotly_corrmap    <- function(data, colscheme, scalelimit){
+    cat(file=stderr(), "make_corrmaps_server::plotly_corrmap()\n")
     
     colscheme_tidied  <- colscheme %>% 
       str_split(":") %>% 

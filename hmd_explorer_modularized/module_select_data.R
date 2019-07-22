@@ -3,7 +3,7 @@
 
 select_data_ui <- function(id, allow_multiple = FALSE, select_sex = TRUE){
   ns <- NS(id)
-  
+  cat(file=stderr(), "select_data_ui()\n")
   sex_select_element <- selectInput(ns("sex_select"),
                 "Select sex of interest",
                 choices = c("Total", "Male", "Female"))
@@ -48,20 +48,27 @@ select_data_ui <- function(id, allow_multiple = FALSE, select_sex = TRUE){
       tagList(pt1, pt2)
     }
     
+    output <- tagList(
+      output,
+      verbatimTextOutput(ns("minmaxyear")),
+      textOutput(ns("country_selected")),
+      textOutput(ns("sex_selected")),
+      textOutput(ns("years_selected")),
+      textOutput(ns("ages_selected")),
+      textOutput(ns("selection_confirmed")),
+
+      tableOutput(ns("data_head_selected"))
+      
+    )
+    
     return(output)
-#    verbatimTextOutput(ns("minmaxyear"))
-    # textOutput(ns("country_selected")),
-    # textOutput(ns("sex_selected")),
-    # textOutput(ns("years_selected")),
-    # textOutput(ns("ages_selected")),
-    # textOutput(ns("selection_confirmed")),
-    # 
-    # tableOutput(ns("data_head_selected"))
     
 #  )
 }
 
 select_data_server <- function(input, output, session, mode = "standard"){
+  cat(file=stderr(), "select_data_server()\n")
+  
   # options for mode should be:
   # # standard      : one or more populations 
   # # sex-compare   : males cf females in same country 
@@ -69,7 +76,8 @@ select_data_server <- function(input, output, session, mode = "standard"){
   ns <- session$ns
   
   # Work out min and max year for the data 
-  get_minmaxyear <- function(full_data = file.path(fld_data, "hmd_data.csv")){
+  get_minmaxyear <- function(full_data = "data/hmd_data.csv"){
+    cat(file=stderr(), "select_data_server::get_minmaxyear\n")
     data <- read_csv(full_data)
     names(data) <- tolower(names(data))
     
@@ -84,15 +92,23 @@ select_data_server <- function(input, output, session, mode = "standard"){
   
   # Internal functions
   load_subset <- function(full_data = "data/hmd_data.csv"){
+    cat(file=stderr(), "select_data_server::load_subset()\n")
+
+    req(country_selected(), ages_selected(), years_selected(), sex_selected())
     
     dta <- read_csv(full_data)
     names(dta) <- tolower(names(dta))
+        
+    selected_country <- country_selected()
+    selected_ages    <- ages_selected()
+    selected_years   <- years_selected()
+    selected_sex     <- sex_selected() 
     
     output <- dta %>%
-      filter(code %in% country_selected()) %>%
-      filter(between(age, ages_selected()[1], ages_selected()[2])) %>%
-      filter(between(year, years_selected()[1], years_selected()[2])) 
-    
+      filter(code %in% selected_country) %>%
+      filter(between(age, selected_ages[1], selected_ages[2])) %>%
+      filter(between(year, selected_years[1], selected_years[2])) 
+
     
     if (mode == "sex-compare")  {
       output <- output %>% 
@@ -101,8 +117,7 @@ select_data_server <- function(input, output, session, mode = "standard"){
         nest()
 
     } else {
-      output <- output %>% filter(gender %in% sex_selected())
-
+      output <- output %>% filter(gender %in% selected_sex)
     }
     
 
@@ -111,7 +126,7 @@ select_data_server <- function(input, output, session, mode = "standard"){
   }
   
   
-  # reactive events
+  # Reactive events
   country_selected     <- eventReactive(input$confirm_selection, {input$code_select   })
   period_snap_selected <- eventReactive(input$confirm_selection, {input$snap_period   })
   sex_selected         <- eventReactive(input$confirm_selection, {input$sex_select    })
@@ -119,7 +134,7 @@ select_data_server <- function(input, output, session, mode = "standard"){
   output_selected      <- eventReactive(input$confirm_selection, {input$output_type   })
   years_selected       <- eventReactive(input$confirm_selection, {input$period_limits })
   
-  # Functions 
+  # Reactive Functions 
   data_subset_selected <- eventReactive(input$confirm_selection, {load_subset()       })
   
   output$minmaxyear    <- renderText({
@@ -143,25 +158,25 @@ select_data_server <- function(input, output, session, mode = "standard"){
   
 
   
-  # 
-  # 
-  # output$country_selected <- renderText({
-  #   paste("The country selected was", country_selected())
-  # })
-  # 
-  # output$sex_selected <- renderText({
-  #   paste("The sex selected was", sex_selected())
-  # })
-  # 
-  # output$ages_selected <- renderText({
-  #   paste("The ages selected were", ages_selected()[1], "to", ages_selected()[2])
-  # })
-  # 
-  # output$years_selected <- renderText({
-  #   paste("The years selected were", years_selected()[1], "to", years_selected()[2])
-  # })
-  # 
-  # output$data_head_selected  <- renderTable({data_subset_selected() %>% head()})
+
+
+  output$country_selected <- renderText({
+    paste("The country selected was", country_selected())
+  })
+
+  output$sex_selected <- renderText({
+    paste("The sex selected was", sex_selected())
+  })
+
+  output$ages_selected <- renderText({
+    paste("The ages selected were", ages_selected()[1], "to", ages_selected()[2])
+  })
+
+  output$years_selected <- renderText({
+    paste("The years selected were", years_selected()[1], "to", years_selected()[2])
+  })
+
+  output$data_head_selected  <- renderTable({data_subset_selected() %>% head()})
   data_all_selected <- reactive({data_subset_selected()})
   
   return(reactive({data_subset_selected()}))
