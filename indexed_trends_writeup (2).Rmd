@@ -1,0 +1,498 @@
+---
+title: "Comparative mortality trends, indexed to 1981, by broad age groups"
+author: "Jon Minton"
+output:
+  html_notebook: default
+  word_document: default
+  pdf_document: default
+  html_document:
+    df_print: paged
+always_allow_html: yes
+---
+
+# Suggested paper structure 
+
+* *Introduction*
+    * Life expectancy in Scotland has tended to lag behind neighbouring nations
+    * In Scotland there are also relatively high rates of mortality in working age groups, and high heath inequalities.
+    * Since 2012 there has been a stalling of life expectancy improvements in many affluent world nations, with Scotland experiencing one of the worst stallings.
+    * In Scotland, this has also contributed to increasing health inequalities.
+    * Aim
+        * The aim of this descriptive paper is to explore trends in mortality rates experienced in different age groups in Scotland, since 1981, in comparison with our nearest neighours:
+            * Neighbour to the South: England & Wales
+            * Neighbour to the East: France
+            * Neighbour to the West: United States of America
+    * We are particularly interested in the extent to which the worsening rates of improvement in life expectancy since 2012 have been present in each of the four countries, and are expressed similarly in different age groups within and between countries.
+* *Methods*
+    * We produce a series of graphs which show how trends in mortality have changed in a range of age groups, indexed to 1981. These indexed trends control for changing population structure within each of the age groups. 
+    * We also summarise some of the values shown in these graphs to illustrate how the trends in mortality rates within age groups have narrowed or widened over time between countries. 
+* *Results*
+    * As below
+* *Discussion*
+    * Based on results shown below, and other analyses to be determined 
+  
+* Key questions/queries
+  * To what extent should the results below also include life expectancy index values along side age-specifc trends?
+  * To what extent should this paper be combined with decomposition analysis?
+
+  
+  
+# Introduction
+
+This short report shows how mortality rates have changed in Scotland, for males and females separately, for a number of broadly defined age groups. Mortality rates are shown indexed to their value in 1981. (e.g. a value of 70 means the mortality rate for that particular age group was 70% of their rate in 1981, and so on.) Mortality rate indixes are also presented for three other countries/country groups (HMD codes shown in parentheses):
+
+* England & Wales (GBRTENW)
+* France (FRANTP)
+* United States (USA)
+
+# Methodology
+
+All data were extracted from the Human Mortality Database (HMD). The mortality rates at each age in single years were calculated from the population exposures and numbers of deaths. A small continuity correction of 5 was added to the numerators and denominators before calculating age-specific mortality rates.  
+
+Each age-specific mortality rate was then indexed to its value in 1981 so that, for example, a value of 110 means a death rate 10% higher than that in 1981, and a value of 90 means a death rate 90% of that observed in 1981. These age-specific mortality indices were then weighted  to produce indices for a smaller number of broader age categories using the following approach:
+
+* Each age in single years was assigned to a broader age category comprising multiple ages in single years;
+* The proportion of the population at each age in single years within each specific broad age category, in each specific year, was calculated to produce a within-category weighting factor;
+* For each year, and each age category, the age-specific mortality indices were multiplied by the weighted factors, then summed, in order to produce a year-specific population weighted mortality index for that age group. 
+
+
+The age categories are as follows:
+
+* 0 to 14 years
+* 15 to 34 years
+* 35 to 54 years
+* 55 to 74 years
+* 75 to 89 years
+* 90 years and above (up to 110 years of age exclusive)
+
+This approach was used in order to adjust for changes in within-age category population structure, which could lead to mortality rates changing for artefactual reasons alone. For example, if the average age within the 55 to 74 year old age strata changes from (say) 62 to 65 between 1981 and 1991, then the overall crude mortality rate within this strata could increase through change in population composition alone, even if the mortality rates at each age in single years within this strata have fallen. 
+
+The above calculations were produced separately for each of the countries, and within each country for males and females separately.
+
+
+```{r, echo = F, warning=F, message = F}
+# Quick script to get indexed trends by age group for Scotland and other countries 
+
+
+rm(list = ls())
+
+pacman::p_load(
+  tidyverse
+)
+
+
+dta_e0 <- read_csv("hmd_explorer/data/hmd_e0.csv")
+
+dta <- read_csv("hmd_explorer/data/hmd_data.csv")
+
+names(dta) <- tolower(names(dta))
+
+correction <- 5 # smaller as added at more individual ages now being added up together in production of each strata
+
+dta %>% 
+  filter(code %in% c("GBR_SCO", "GBRTENW", "FRATNP", "USA")) %>% 
+  mutate(code = fct_recode(code, 
+    Scotland = 'GBR_SCO', `England & Wales` = 'GBRTENW',
+    France = 'FRATNP', `United States` = "USA"
+    ),
+    code = fct_relevel(code,
+      'Scotland', 'England & Wales', 'France', 'United States'                       
+    )
+  ) %>% 
+  filter(year >= 1980) %>% 
+  mutate(
+    age_group = cut(
+      age, 
+      breaks = c(0, 14, 34, 54, 74, 89, 109),
+      include.lowest = T
+    )
+  ) %>% 
+  filter(gender != "Total") %>% 
+  filter(!is.na(age_group)) %>% 
+  mutate(mr = (num_deaths + correction) / (exposure + correction)) %>% 
+  group_by(code, year, gender, age_group) %>% 
+  mutate(pop_in_strata = sum(num_population, na.rm = T)) %>% # This is the population size within each age strata, for each country-year-gender combination
+  ungroup() %>% 
+  mutate(prop_in_strata = num_population / pop_in_strata) %>% # This is the within-strata proportion of the population represented by each age in single ears 
+  group_by(code, gender, age) %>% 
+  mutate(index = 100 * mr / mr[year == 1981]) %>% # this produced the indices for ages in single years
+  ungroup() %>% 
+  mutate(tmp = index * prop_in_strata) %>%  # this is the indexed value multiplied by the within-strata proportion of the population
+  group_by(code, gender, age_group, year) %>% 
+  summarise(weighted_index = sum(tmp)) %>% # this is the weighted index for each strata
+  ungroup() -> indices_weighted
+
+
+```
+
+```{r,  echo = F, warning=F, message = F}
+
+grab_index <- function(x, selected_gender, selected_year, selected_age_group, selected_country = 'Scotland'){
+  x %>% 
+    filter(gender == selected_gender) %>% 
+    filter(age_group == selected_age_group) %>% 
+    filter(year == selected_age_group) %>% 
+    filter(code == selected_country) %>% 
+    pull(weighted_index) %>% 
+    round(0)
+}
+
+```
+
+# Results 
+
+Figures showing how the weighted indices changed since 1981 are shown separately for females and males below. 
+
+# Life expectancies 
+
+
+```{r, echo = F, warning = F, message = F}
+dta_e0 %>% 
+  filter(gender != "total") %>% 
+  filter(code %in% c("GBR_SCO", "GBRTENW", "FRATNP", "USA")) %>% 
+  mutate(code = fct_recode(code, 
+    Scotland = 'GBR_SCO', `England & Wales` = 'GBRTENW',
+    France = 'FRATNP', `United States` = "USA"
+    ),
+    code = fct_relevel(code,
+      'Scotland', 'England & Wales', 'France', 'United States'                       
+    )
+  ) %>% 
+  filter(year >= 1980) %>% 
+  ggplot(aes(x = year, y = e0, group = code, colour = code, size = code, linetype = code)) + 
+  facet_wrap(~gender) + 
+  geom_line() +
+  theme_minimal() +
+  scale_size_manual(values = c(1, 1, 1.3, 1.3)) + 
+  scale_linetype_manual(values = c("solid", "longdash", "twodash", "solid")) +
+  labs(
+    title = "Life expectancy at birth for Scotland and neighbouring populations",
+    caption = "Source: Human Mortality Database",
+    x = "Year", 
+    y = "Life expectancy at birth in years",
+    colour = "Country", 
+    linetype = "Country",
+    size = "Country"
+  ) 
+  
+ggsave("figures/life_expectancy_fourcountries.png", height = 25, width = 25, units = 'cm', dpi = 300)
+```
+
+## Life expectancy trends 
+
+```{r, echo = F, warning=F}
+
+dta_e0 %>% 
+  filter(gender != "total") %>% 
+  filter(code %in% c("GBR_SCO", "GBRTENW", "FRATNP", "USA")) %>% 
+  mutate(code = fct_recode(code, 
+    Scotland = 'GBR_SCO', `England & Wales` = 'GBRTENW',
+    France = 'FRATNP', `United States` = "USA"
+    ),
+    code = fct_relevel(code,
+      'Scotland', 'England & Wales', 'France', 'United States'                       
+    )
+  ) %>% 
+  filter(year >= 1980) %>% 
+  group_by(code, gender) %>% 
+  mutate(indexed_e0 = 100 * (e0 / e0[year == 1981])) %>%
+  ungroup() %>% 
+  ggplot(aes(x = year, y = indexed_e0, group = code, colour = code, size = code, linetype = code)) + 
+  facet_wrap(~gender) + 
+  geom_line() +
+  theme_minimal() +
+  geom_vline(xintercept = 2014, linetype = "dashed") + 
+  scale_size_manual(values = c(1, 1, 1.3, 1.3)) + 
+  scale_linetype_manual(values = c("solid", "longdash", "twodash", "solid")) +
+  labs(
+    title = "Change in Life expectancy at birth for Scotland and neighbouring populations since 1981",
+    subtitle = "Index year: 1981; Indexed to 100. Dashed line indicates 2014",
+    caption = "Source: Human Mortality Database",
+    x = "Year", 
+    y = "Life expectancy at birth in years",
+    colour = "Country", 
+    linetype = "Country",
+    size = "Country"
+  ) 
+
+ggsave("figures/life_expectancy_trends_fourcountries.png", height = 25, width = 25, units = 'cm', dpi = 300)
+
+```
+
+## Figure for females
+
+```{r, echo = F, warning=F}
+indices_weighted %>% 
+  filter(gender == 'Female') %>% 
+  ggplot(aes(x = year, y = weighted_index, group = age_group, linetype = age_group, size = age_group, colour = age_group)) + 
+  geom_line() + 
+  facet_wrap(~code) + 
+  theme_minimal() + 
+  geom_hline(yintercept = 100) +
+  scale_size_manual(values = c(1, 1, 1, 1.3, 1.3, 1.3)) + 
+  scale_linetype_manual(values = c("solid", "longdash", "twodash", "solid", "longdash", "twodash")) + 
+  labs(
+    title = "Index of mortality rates, England/Wales and Scotland. Females",
+    subtitle = "Base year: 1981. Weighted by population size within each age strata", 
+    caption = "Source: Human Mortality Database",
+    x = "Year", 
+    y = "Index value (100 = 1981 rates)",
+    colour = "Age group", 
+    linetype = "Age group",
+    size = "Age group"
+  ) + 
+  scale_y_continuous(limits = c(20, 130), breaks = seq(20, 130, by = 10))
+
+ggsave("figures/age_trends_females_weighted.png", height = 25, width = 25, units = 'cm', dpi = 300)
+```
+
+## Figure for males 
+
+```{r, echo = F, warning=F}
+indices_weighted %>% 
+  filter(gender == 'Male') %>% 
+  ggplot(aes(x = year, y = weighted_index, group = age_group, linetype = age_group, size = age_group, colour = age_group)) + 
+  geom_line() + 
+  facet_wrap(~code) + 
+  theme_minimal() + 
+  geom_hline(yintercept = 100) +
+  scale_size_manual(values = c(1, 1, 1, 1.3, 1.3, 1.3)) + 
+  scale_linetype_manual(values = c("solid", "longdash", "twodash", "solid", "longdash", "twodash")) + 
+  labs(
+    title = "Index of mortality rates, England/Wales and Scotland. Males",
+    subtitle = "Base year: 1981. Weighted by population size within each age strata", 
+    caption = "Source: Human Mortality Database",
+    x = "Year", 
+    y = "Index value (100 = 1981 rates)",
+    colour = "Age group", 
+    linetype = "Age group",
+    size = "Age group"
+  ) + 
+  scale_y_continuous(limits = c(20, 130), breaks = seq(20, 130, by = 10))
+
+ggsave("figures/age_trends_males_weighted.png", height = 25, width = 25, units = 'cm', dpi = 300)
+
+```
+
+## Discussion of results 
+
+There has been a clear trend towards towards falling mortality rates in all countries, and for both males and females, but there are also clear differences by age group, gender and country. This discussion will look at each age group, from infants and children at the start of the life course, to the very elderly at the end of the life course, and within each age category discuss the general trends, gender differences, and how Scotland compares with the other countries selected. 
+
+### Infants and young children
+
+Weighted mortality rate indices have fallen faster amongst 0-14 year olds than amongst any other age groups, for males and females, in every country *except Scotland* since 1981. The following table shows how the weighted index has changed since 1981 for each population under consideration.
+
+```{r, echo = F, warning=F, format = 'asis'}
+indices_weighted %>% 
+  filter(age_group == '[0,14]') %>% 
+  filter(year %in% c(1990, 2000, 2010, 2016)) %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  spread(year, weighted_index) %>% 
+  knitr::kable(
+    digits = 0, 
+    caption = "Weighted index of mortality rates in 0-14 year olds (1981 = 100), selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+
+Within this age group, mortality rates fell to to between 60-70% of their 1981 rates in Scotland, compared to around 30-40% in France, and 40-50% in England & Wales and the USA. 
+
+Though the trends in mortality rate improvements in these age groups have been less favourable in Scotland than in these other populations, only a small proportion of all deaths that occur,  occur in infancy and childhood, so these trends alone do little to explain either Scotland's relative disadvantage in longevity overall, or differences in trends after around 2012. 
+
+### Older children and younger adults (15-34 year olds)
+
+The trends in this age group are generally less favourable than other age groups in each of the populations being compared, and are particularly unfavourable in Scotland. Whereas the trends in most other age groups have been towards considerable improvements ( falling mortality rates) since 1981, in this age group there is more evidence of stalling in the other countries, and worsening in Scotland. The table below shows how index values in this age group compares in the eight population groups of interest.
+
+
+```{r, echo = F, warning=F, format = 'asis'}
+
+indices_weighted %>% 
+  filter(age_group == '(14,34]') %>% 
+  filter(year %in% c(1990, 2000, 2010, 2016)) %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  spread(year, weighted_index) %>% 
+  knitr::kable(
+    digits = 0, 
+    caption = "Weighted index of mortality rates in 15-34 year olds (1981 = 100), selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+Mortality rates in these age groups were between a tenth and an eighth higher in Scotland by 2000 compared with 1981, and by 2016 fell only marginally for women, and to around 85% of their 1981 values in Scotland. At their peak, in the late 1990s/early 2000s, mortality rates in males were around a fifth higher, and in females a tenth higher, than in 1981. 
+
+Trends had also stalled in the USA throughout the 1980s, before falling in the early/mid 1990s. Mortality rates also remained stalled in England & Wales for males, before improving in the mid/late 1990s, and continued to improve for females; by 2016 mortality rate improvements had become roughly equal for both gender.  In France, the mid 1990s marked an acceleration in improvements for both genders, which continued in subsequent periods, such that by 2016 mortality rates in this age group were less than half their level in 1981. 
+
+
+### Middle working age (35-54 year olds)
+
+Mortality rate improvements in the middle of working age have tended to be more persistent in this age group than in the 15-34 year old age group, with more gradual improvements observed in each country and both genders. *However, it is also within this age group that sudden changes towards either stagnation (England/Wales) or worsenings (Scotland, and to a lesser extent USA) since around 2012 can be observed.* The increase in mortality rates between 2010 and 2016 can be seen in the graphs above, and the table below. 
+
+
+```{r, echo = F, warning=F, format = 'asis'}
+
+indices_weighted %>% 
+  filter(age_group == '(34,54]') %>% 
+  filter(year %in% c(1990, 2000, 2010, 2016)) %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  spread(year, weighted_index) %>% 
+  knitr::kable(
+    digits = 0, 
+    caption = "Weighted index of mortality rates in 35-54 year olds (1981 = 100), selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+In Scotland, mortality rates in this age group increased by almost a tenth in both males and females between 2010 and 2016. In the USA, they increased by around an eighth. Over the same period, they fell by around 5% in England & Wales, and around 15-20% in France. 
+
+### Late working age and early retirement ages (55-74 years of age)
+
+Mortality rates in this age group have seen the fastest rates of improvement in Scotland since 1981, compared with other popualtion groups, but have been stalling in recent years. They fell by around 10-15% from 1981 to 1990, by around 20% from 1990 to 2000, by around a quarter from 2000 to 2010, but by only around 8-10% between 2010 and 2016. Though this latter comparison is of a shorter time period, a slowdown in the trends seems evident from the figures. 
+
+Similar slowdowns are also seen in England & Wales, and France, and flattening mortality improvements have been observed in the USA. 
+
+
+```{r, echo = F, warning=F, format = 'asis'}
+
+indices_weighted %>% 
+  filter(age_group == '(54,74]') %>% 
+  filter(year %in% c(1990, 2000, 2010, 2016)) %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  spread(year, weighted_index) %>% 
+  knitr::kable(
+    digits = 0, 
+    caption = "Weighted index of mortality rates in 55-74 year olds (1981 = 100), selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+
+### Central retirement ages (75-89 year olds)
+
+The table below shows the index values for this age group in each of the population gruops. 
+
+
+
+
+```{r, echo = F, warning=F, format = 'asis'}
+
+indices_weighted %>% 
+  filter(age_group == '(74,89]') %>% 
+  filter(year %in% c(1990, 2000, 2010, 2016)) %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  spread(year, weighted_index) %>% 
+  knitr::kable(
+    digits = 0, 
+    caption = "Weighted index of mortality rates in 75-89 year olds (1981 = 100), selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+Within this age band, the relative improvements between 1981 and 2016 were larger for males than females in Scotland (51 for males compared with 63 for females), in England & Wales (49 compared with 57), and in the USA (61 comapred with 73), whereas in France the index of improvement was slightly greater in females (44) than males.  
+
+There have been very consistent trends in mortality rate improvement in both genders and all four countries in this age group. However, annual rates of improvement have been more modest in recent years. The table below shows the average change in the index values for each of the eight population groups over the 1980s, 1990s, 2000s, and between 2010 and 2016. With the exception of females in the 1980s, average rates of annual improvement have been substantially less in the 2010-2016 period than in earlier decades. In Scotland, annual improvements in the 2000s were around three times larger than improvements over this latter period in women, and around twice as large in men. The equivalent relative improvement ratios, were around 2.6 times (females) and 3.0 times (males) in England & Wales, 1.7 (females) and 1.4 (males) in France, and around 2.5 times greater in the USA for both males and females.   
+
+```{r, echo = F, warning=F, format = 'asis'}
+indices_weighted %>% 
+  filter(age_group == '(74,89]') %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  group_by(gender, country) %>% 
+  arrange(year) %>% 
+  mutate(change = weighted_index - lag(weighted_index)) %>% 
+  mutate(period = cut(
+    year, 
+    breaks = c(1980, 1990, 2000, 2010, 2016), 
+    labels = c("1980s", "1990s", "2000s", "2010-2016"),
+    include.lowest =  T
+    )
+  ) %>% 
+  group_by(country, gender, period) %>% 
+  summarise(mean_change = mean(change, na.rm = T)) %>%
+  ungroup() %>% 
+  mutate(mean_change = round(mean_change, 2)) %>% 
+  arrange(country, gender, period) %>% 
+  spread(period, mean_change) %>% 
+  knitr::kable(
+    digits = 2, 
+    caption = "Average annual change in index values for 75-89 year olds, by period, selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+Though there have not been clear increases in mortality risks in this age group, because a large proportion of all deaths that occur, tend to occur in these age groups, the clear slowdown in improvements in this age group is likely to be an important driver of falling and stalling life expectancies. The international comparison shows that, unlike the trends in some younger age groups, this phenomenon is not specific to Scotland.
+
+
+### Older pensioners (90 year olds and above)
+
+
+The table below shows the index values for this age group in each of the population groups. General tendencies towards continually improving mortality at these ages were observed for Scotland, England & Wales, and France since the early 1980s, but not in the USA, where mortality rates increased modestly until the early 2000s, before starting to fall. In Scotland, England & Wales, and France there are indications of stalling improvements after around 2010-2012, consistent with that observed in the previous age groups, whereas trends in the USA are continuing to improve as they catch up towards the other three countries.
+
+
+
+```{r, echo = F, warning=F, format = 'asis'}
+
+indices_weighted %>% 
+  filter(age_group == '(89,109]') %>% 
+  filter(year %in% c(1990, 2000, 2010, 2016)) %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  spread(year, weighted_index) %>% 
+  knitr::kable(
+    digits = 0, 
+    caption = "Weighted index of mortality rates in 90 year olds and above (1981 = 100), selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+The table below shows the average annual change in index values over the 1980s, 1990s, 2000s, and the period 2010-2016. This illustrates some additional complications in the trends. As with males and females in the USA, there is some evidence of 'catch up' in the latest period for males in Scotland, with a *higher* average rate of improvement for males in the 2010s than the 2000s; for Scottish females, the rates of improvement are similar in the 2010s than the 2000s. 
+
+In France, and in England & Wales, average rates of improvement in the 2010s were considerably smaller than in the 2000s, whereas improvements accelerated over the latter compared with previous period for both genders in the USA. 
+
+```{r, echo = F, warning=F, format = 'asis'}
+indices_weighted %>% 
+  filter(age_group == '(89,109]') %>% 
+  select(-age_group) %>% 
+  rename(country = code) %>% 
+  group_by(gender, country) %>% 
+  arrange(year) %>% 
+  mutate(change = weighted_index - lag(weighted_index)) %>% 
+  mutate(period = cut(
+    year, 
+    breaks = c(1980, 1990, 2000, 2010, 2016), 
+    labels = c("1980s", "1990s", "2000s", "2010-2016"),
+    include.lowest =  T
+    )
+  ) %>% 
+  group_by(country, gender, period) %>% 
+  summarise(mean_change = mean(change, na.rm = T)) %>%
+  ungroup() %>% 
+  mutate(mean_change = round(mean_change, 2)) %>% 
+  arrange(country, gender, period) %>% 
+  spread(period, mean_change) %>% 
+  knitr::kable(
+    digits = 2, 
+    caption = "Average annual change in index values for 90 year olds and older, by period, selected countries."
+  ) %>% 
+  kableExtra::kable_styling() 
+
+```
+
+
+# Summary
+
+This document has shown how the population weighted indices of mortality change since 1981 differ between age groups and genders within Scotland and three comparator populations. Overall, there have been marked improvements in mortality in each of these age groups, but with considerable variation between populations. Mortality trends in Scotland departed most from the comparator countries in 15-34 year olds, and improvements in infant and childhood mortality (0-14 years old), in particular, have been much slower than in other countries. There is also evidence of catch-up in mortality trends, however, such as within the 55-74 year old age strata. 
+
+In rich countries, majority of deaths occur at older ages, and so more modest changes in trends at these older ages are likely to impact life expectancy much more than larger changes at younger ages. Scotland has been similar to the comparator countries in seeing slow downs in mortality rate improvements in these older ages in the 2010s, though there is also evidence of mortality rates increasing, rather than simply falling more slowly, at many ages in Scotland in recent years. 
