@@ -1,83 +1,146 @@
+# HMD Explorer - Modularized Version
+# Main application file
 
 library(shiny)
 source("global.R")
 
 ui <- fluidPage(
+
   titlePanel("Human Mortality Database Explorer"),
-  
+
   sidebarLayout(
     sidebarPanel(
-      verbatimTextOutput("tab_active"),
-      
-
-      uiOutput("sidebar_select")
-      
+      # Dynamic sidebar based on active tab
+      uiOutput("sidebar_controls")
     ),
-    
-    # Show a plot of the generated distribution
+
     mainPanel(
-      tabsetPanel(type = "tabs", id = "main_tabset", 
-        tabPanel("individual",         title = "Individual Population",
-          make_graphics_ui("graphics_module_singular-singular")         
+      tabsetPanel(
+        type = "tabs",
+        id = "main_tabset",
+
+        # Tab 1: Individual Population Mortality
+        tabPanel(
+          "Mortality",
+          value = "mortality",
+          make_graphics_ui("graphics_mortality")
         ),
-        tabPanel("group",              title = "Group of Populations",
-          make_graphics_ui("graphics_module_group-singular")       
+
+        # Tab 2: Population
+        tabPanel(
+          "Population",
+          value = "population",
+          make_graphics_ui("graphics_population")
         ),
-        tabPanel("sex_compare",        title = "Comparison between Genders",
-          make_graphics_ui("graphics_module_singular-comparative")       
+
+        # Tab 3: Mortality Sex Ratios
+        tabPanel(
+          "Mortality Sex Ratios",
+          value = "mort_sex_ratio",
+          make_graphics_ui("graphics_mort_ratio")
         ),
-        tabPanel("group_compare",      title = "Comparison between Populations",
-          make_graphics_ui("graphics_module_group-comparative")       
+
+        # Tab 4: Population Sex Ratios
+        tabPanel(
+          "Population Sex Ratios",
+          value = "pop_sex_ratio",
+          make_graphics_ui("graphics_pop_ratio")
         ),
-        tabPanel("corr_individual",    title = "Correlation in trends by age",
-                 make_corrmaps_ui("corrmaps_singular-singular")       
+
+        # Tab 5: Group Comparisons
+        tabPanel(
+          "Mortality Group Comparisons",
+          value = "group_compare",
+          make_graphics_ui("graphics_group_compare")
+        ),
+
+        # Tab 6: Lifetable
+        tabPanel(
+          "Lifetable",
+          value = "lifetable",
+          make_lifetable_ui("lifetable_module")
+        ),
+
+        # Tab 7: Correlation in trends
+        tabPanel(
+          "Correlation in Trends",
+          value = "correlation",
+          make_corrmaps_ui("corrmaps_module")
         )
       )
     )
   )
 )
 
-server <- function(input, output) {
-  get_active_tab <- reactive({input$main_tabset})
-  
-  output$sidebar_select <- renderUI({
+server <- function(input, output, session) {
 
-    switch(get_active_tab(),
-           "Individual Population"            = select_data_ui("data_module1_singular"),
-           "Group of Populations"             = select_data_ui("data_module1_singular", allow_multiple = TRUE),
-           "Comparison between Genders"       = select_data_ui("data_module1_singular", select_sex = FALSE),
-           "Comparison between Populations"   = tagList(
-                                                  select_data_ui("data_module1_singular"),
-                                                  select_data_ui("data_module2_singular")
-                                              ),
-           "Correlation in trends by age"     = select_data_ui("data_module1_singular")
-    )
-    
+  # Get active tab reactively
+  active_tab <- reactive({
+    input$main_tabset
   })
-  
-  
-  
-  data1_sexcompare <- callModule(select_data_server, "data_module1_singular", mode = "sex-compare")
-  data1_singular   <- callModule(select_data_server, "data_module1_singular"                      )
-  data2_singular   <- callModule(select_data_server, "data_module2_singular"                      )
 
-  
-  callModule(make_graphics_server, "graphics_module_singular-singular", 
-             mode = "singular-singular", data = data1_singular)
-  callModule(make_graphics_server, "graphics_module_group-singular", 
-             mode = "group-singular",    data = data1_singular)
-  callModule(make_graphics_server, "graphics_module_singular-comparative", 
-             mode = "sex-compare",       data = data1_sexcompare)
-  callModule(make_graphics_server, "graphics_module_group-comparative", 
-             mode = "group-comparative", data = data1_singular)
-  
-  callModule(make_corrmaps_server, "corrmaps_singular-singular", 
-                                         data = data1_singular)
-  
-  
+  # Dynamic sidebar UI based on active tab
+  output$sidebar_controls <- renderUI({
+    tab <- active_tab()
+
+    switch(
+      tab,
+      "mortality" = select_data_ui("data_mortality"),
+      "population" = select_data_ui("data_population"),
+      "mort_sex_ratio" = select_data_ui("data_mort_ratio", select_sex = FALSE),
+      "pop_sex_ratio" = select_data_ui("data_pop_ratio", select_sex = FALSE),
+      "group_compare" = tagList(
+        h4("Population Group B"),
+        select_data_ui("data_group_b", allow_multiple = TRUE),
+        h4("Comparator Group A"),
+        select_data_ui("data_group_a", allow_multiple = TRUE)
+      ),
+      "lifetable" = select_data_ui("data_lifetable", select_sex = TRUE),
+      "correlation" = select_data_ui("data_correlation"),
+      # Default
+      select_data_ui("data_default")
+    )
+  })
+
+  # Data modules - use moduleServer pattern
+  data_mortality <- select_data_server("data_mortality")
+  data_population <- select_data_server("data_population")
+  data_mort_ratio <- select_data_server("data_mort_ratio", mode = "sex-compare")
+  data_pop_ratio <- select_data_server("data_pop_ratio", mode = "sex-compare")
+  data_group_b <- select_data_server("data_group_b")
+  data_group_a <- select_data_server("data_group_a")
+  data_lifetable <- select_data_server("data_lifetable")
+  data_correlation <- select_data_server("data_correlation")
+
+  # Graphics modules
+  make_graphics_server("graphics_mortality",
+                       mode = "singular",
+                       data = data_mortality)
+
+  make_graphics_server("graphics_population",
+                       mode = "population",
+                       data = data_population)
+
+  make_graphics_server("graphics_mort_ratio",
+                       mode = "sex-compare",
+                       data = data_mort_ratio)
+
+  make_graphics_server("graphics_pop_ratio",
+                       mode = "pop-sex-compare",
+                       data = data_pop_ratio)
+
+  make_graphics_server("graphics_group_compare",
+                       mode = "group-compare",
+                       data = data_group_b,
+                       data_comparator = data_group_a)
+
+  # Lifetable module
+  make_lifetable_server("lifetable_module",
+                        data = data_lifetable)
+
+  # Correlation module
+  make_corrmaps_server("corrmaps_module",
+                       data = data_correlation)
 }
-
-
-
 
 shinyApp(ui, server)

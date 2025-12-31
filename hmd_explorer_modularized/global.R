@@ -1,57 +1,52 @@
-# Global file 
+# Global configuration for HMD Explorer (Modularized)
 
-pacman::p_load(
-  magrittr, 
-  tidyverse,
-  plotly,
-  shiny,
-  RColorBrewer,
-  viridis
-)
+# Load packages
+suppressPackageStartupMessages({
+  library(magrittr)
+  library(tidyverse)
+  library(plotly)
+  library(shiny)
+  library(RColorBrewer)
+  library(viridis)
+})
 
-# Sources
+# Source helper functions
+source("R/data_transforms.R")
 
-source("module_make_corrmaps.R")
+# Source modules
 source("module_colscheme_selector.R")
-source("module_make_graphics.R")
 source("module_select_data.R")
+source("module_make_graphics.R")
+source("module_make_corrmaps.R")
+source("module_lifetable.R")
 
-# Data
-full_data <- read_csv("data/hmd_data.csv")
+# Load data
+full_data <- read_csv("data/hmd_data.csv", show_col_types = FALSE)
+names(full_data) <- tolower(names(full_data))
 
 codes_named <- read_rds("data/codes_named.rds")
 
-all_colbrew_pals <- brewer.pal.info %>% 
-  as_tibble(rownames = "pal_name") %>% 
-  pull(pal_name) %>% 
-  str_c("RColorBrewer", ":", .)
-
-
-# Functions
-
-
-define_colbrew_pals <- function(category, colorblind){
-  cat(file=stderr(), "define_colbrew_pals()\n")
-  out <- RColorBrewer %>% 
-    as_tibble(rownames = "pal_name") 
-  
-  if (!is.null(category)) {
-    out <- out %>% filter(category == category)
-  }
-  if (!is.null(colorblind)) {
-    out <- out %>% filter(colorblind == colorblind)
-  }
-  
-  out
+# Load life expectancy data if available
+hmd_e0_path <- "data/hmd_e0.csv"
+if (file.exists(hmd_e0_path)) {
+  hmd_e0 <- read_csv(hmd_e0_path, show_col_types = FALSE)
+  names(hmd_e0) <- tolower(names(hmd_e0))
+  hmd_e0 <- hmd_e0 %>%
+    mutate(gender = tolower(gender))
 }
 
+# Color palette definitions
+all_colbrew_pals <- brewer.pal.info %>%
+  as_tibble(rownames = "pal_name") %>%
+  pull(pal_name) %>%
+  str_c("RColorBrewer:", .)
 
+viridis_pals <- c(
+  "Viridis:viridis",
+  "Viridis:magma",
+  "Viridis:plasma",
+  "Viridis:inferno",
+  "Viridis:cividis"
+)
 
-create_colbrew_ramp <- function(palname){
-  max_n <- brewer.pal.info %>% 
-    as_tibble(rownames = "pal_name") %>% 
-    filter(pal_name == palname) %>% 
-    pull(maxcolors)
-  
-  colorRampPalette(brewer.pal(name = palname, n = max_n))
-}
+all_palettes <- c(viridis_pals, all_colbrew_pals)
