@@ -35,3 +35,29 @@ vignettes/*.pdf
 # Shiny token, see https://shiny.rstudio.com/articles/shinyapps.html
 rsconnect/
 .Rproj.user
+
+# Generated outputs (keep in archive branch if needed)
+figures/
+tables/
+*.nb.html
+*.docx
+*.tex
+
+# Large data files (keep app-specific data in hmd_explorer/data/)
+data/
+
+# Temporary/support files
+support/
+support_unzipped/
+*.zip
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Presentation outputs
+presentation/
+
+# Research document outputs (source Rmd files should be in archive branch)
+*.html
+!README.html
