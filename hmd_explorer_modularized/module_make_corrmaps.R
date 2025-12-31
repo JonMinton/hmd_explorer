@@ -240,7 +240,8 @@ make_corrmaps_server <- function(id, data) {
         layout(
           yaxis = list(title = "Age", scaleanchor = "x"),
           xaxis = list(title = "Age")
-        )
+        ) %>%
+        event_register("plotly_click")
 
       return(p)
     }

@@ -375,7 +375,8 @@ make_graphics_server <- function(id, mode = "singular", data, data_comparator = 
           layout(
             yaxis = list(title = "Age in years"),
             xaxis = list(title = "Year")
-          )
+          ) %>%
+          event_register("plotly_click")
       } else {
         # 3D surface with source for crosstalk
         p <- plot_ly(
@@ -400,7 +401,8 @@ make_graphics_server <- function(id, mode = "singular", data, data_comparator = 
               y = 1,
               z = 0.5
             )
-          ))
+          )) %>%
+          event_register("plotly_click")
       }
 
       return(p)
