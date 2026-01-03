@@ -1,0 +1,114 @@
+/* Resizable panels styles for HMD Explorer */
+
+/* Horizontal splitter (for row layout - main on top, subplots below) */
+.splitter-horizontal {
+  height: 8px;
+  background: linear-gradient(to bottom, #e0e0e0, #d0d0d0, #e0e0e0);
+  cursor: row-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid #ccc;
+  border-bottom: 1px solid #ccc;
+  margin: 4px 0;
+  transition: background-color 0.2s;
+}
+
+.splitter-horizontal:hover {
+  background: linear-gradient(to bottom, #c0c0c0, #b0b0b0, #c0c0c0);
+}
+
+.splitter-horizontal::before {
+  content: '';
+  width: 40px;
+  height: 4px;
+  background: #999;
+  border-radius: 2px;
+}
+
+/* Vertical splitter (for column layout - main on left, subplots on right) */
+.splitter-vertical {
+  width: 8px;
+  background: linear-gradient(to right, #e0e0e0, #d0d0d0, #e0e0e0);
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-left: 1px solid #ccc;
+  border-right: 1px solid #ccc;
+  margin: 0 4px;
+  transition: background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.splitter-vertical:hover {
+  background: linear-gradient(to right, #c0c0c0, #b0b0b0, #c0c0c0);
+}
+
+.splitter-vertical::before {
+  content: '';
+  width: 4px;
+  height: 40px;
+  background: #999;
+  border-radius: 2px;
+}
+
+/* Container for row layout (vertical stacking with horizontal splitter) */
+.resizable-row-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+.resizable-row-container .main-panel {
+  flex: 1 1 auto;
+  min-height: 100px;
+  overflow: hidden;
+}
+
+.resizable-row-container .subplot-panel {
+  flex: 0 0 auto;
+  min-height: 100px;
+  overflow: hidden;
+}
+
+/* Container for column layout (horizontal stacking with vertical splitter) */
+.resizable-col-container {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+}
+
+.resizable-col-container .main-panel {
+  flex: 0 0 65%;
+  min-width: 150px;
+  overflow: hidden;
+}
+
+.resizable-col-container .subplot-panel {
+  flex: 0 0 calc(35% - 16px);
+  min-width: 150px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Ensure plotly plots resize properly */
+.resizable-row-container .plotly,
+.resizable-col-container .plotly {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Active state during drag */
+.splitter-horizontal.active,
+.splitter-vertical.active {
+  background: #3498db;
+}
+
+.splitter-horizontal.active::before,
+.splitter-vertical.active::before {
+  background: white;
+}

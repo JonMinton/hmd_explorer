@@ -1,74 +1,89 @@
 # HMD Explorer - Modularized Version
-# Main application file
+# Main application file with Bootstrap styling via bslib
 
 library(shiny)
 source("global.R")
 
-ui <- fluidPage(
+# Define Bootstrap theme
+hmd_theme <- bs_theme(
 
-  titlePanel("Human Mortality Database Explorer"),
+  version = 5,
+  bootswatch = "flatly",
+  primary = "#2c3e50",
+  secondary = "#95a5a6",
+  success = "#18bc9c",
+  info = "#3498db",
+  warning = "#f39c12",
+  danger = "#e74c3c",
+  base_font = font_google("Open Sans"),
+  heading_font = font_google("Roboto Slab")
+)
 
-  sidebarLayout(
-    sidebarPanel(
-      # Dynamic sidebar based on active tab
-      uiOutput("sidebar_controls")
-    ),
+ui <- page_navbar(
+  # Include custom CSS and JS for resizable panels
+  tags$head(
+    tags$link(rel = "stylesheet", type = "text/css", href = "css/resizable-panels.css"),
+    tags$script(src = "js/resizable-panels.js")
+  ),
+  title = "Human Mortality Database Explorer",
+  theme = hmd_theme,
+  id = "main_tabset",
+  fillable = TRUE,
 
-    mainPanel(
-      tabsetPanel(
-        type = "tabs",
-        id = "main_tabset",
+  # Sidebar layout within each nav panel
+  sidebar = sidebar(
+    id = "main_sidebar",
+    width = 300,
+    uiOutput("sidebar_controls")
+  ),
 
-        # Tab 1: Individual Population Mortality
-        tabPanel(
-          "Mortality",
-          value = "mortality",
-          make_graphics_ui("graphics_mortality")
-        ),
+  # Tab 1: Individual Population Mortality
+  nav_panel(
+    title = "Mortality",
+    value = "mortality",
+    make_graphics_ui("graphics_mortality")
+  ),
 
-        # Tab 2: Population
-        tabPanel(
-          "Population",
-          value = "population",
-          make_graphics_ui("graphics_population")
-        ),
+  # Tab 2: Population
+  nav_panel(
+    title = "Population",
+    value = "population",
+    make_graphics_ui("graphics_population")
+  ),
 
-        # Tab 3: Mortality Sex Ratios
-        tabPanel(
-          "Mortality Sex Ratios",
-          value = "mort_sex_ratio",
-          make_graphics_ui("graphics_mort_ratio")
-        ),
+  # Tab 3: Mortality Sex Ratios
+  nav_panel(
+    title = "Mortality Sex Ratios",
+    value = "mort_sex_ratio",
+    make_graphics_ui("graphics_mort_ratio")
+  ),
 
-        # Tab 4: Population Sex Ratios
-        tabPanel(
-          "Population Sex Ratios",
-          value = "pop_sex_ratio",
-          make_graphics_ui("graphics_pop_ratio")
-        ),
+  # Tab 4: Population Sex Ratios
+  nav_panel(
+    title = "Population Sex Ratios",
+    value = "pop_sex_ratio",
+    make_graphics_ui("graphics_pop_ratio")
+  ),
 
-        # Tab 5: Group Comparisons
-        tabPanel(
-          "Mortality Group Comparisons",
-          value = "group_compare",
-          make_graphics_ui("graphics_group_compare")
-        ),
+  # Tab 5: Group Comparisons
+  nav_panel(
+    title = "Group Comparisons",
+    value = "group_compare",
+    make_graphics_ui("graphics_group_compare")
+  ),
 
-        # Tab 6: Lifetable
-        tabPanel(
-          "Lifetable",
-          value = "lifetable",
-          make_lifetable_ui("lifetable_module")
-        ),
+  # Tab 6: Lifetable
+  nav_panel(
+    title = "Lifetable",
+    value = "lifetable",
+    make_lifetable_ui("lifetable_module")
+  ),
 
-        # Tab 7: Correlation in trends
-        tabPanel(
-          "Correlation in Trends",
-          value = "correlation",
-          make_corrmaps_ui("corrmaps_module")
-        )
-      )
-    )
+  # Tab 7: Correlation in trends
+  nav_panel(
+    title = "Correlation",
+    value = "correlation",
+    make_corrmaps_ui("corrmaps_module")
   )
 )
 
@@ -107,8 +122,8 @@ server <- function(input, output, session) {
   data_population <- select_data_server("data_population")
   data_mort_ratio <- select_data_server("data_mort_ratio", mode = "sex-compare")
   data_pop_ratio <- select_data_server("data_pop_ratio", mode = "sex-compare")
-  data_group_b <- select_data_server("data_group_b")
-  data_group_a <- select_data_server("data_group_a")
+  data_group_b <- select_data_server("data_group_b", allow_multiple = TRUE)
+  data_group_a <- select_data_server("data_group_a", allow_multiple = TRUE)
   data_lifetable <- select_data_server("data_lifetable")
   data_correlation <- select_data_server("data_correlation")
 

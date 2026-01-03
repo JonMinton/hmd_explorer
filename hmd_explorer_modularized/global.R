@@ -6,12 +6,18 @@ suppressPackageStartupMessages({
   library(tidyverse)
   library(plotly)
   library(shiny)
+  library(bslib)
   library(RColorBrewer)
   library(viridis)
+  library(scales)
 })
 
-# Source helper functions
-source("R/data_transforms.R")
+# Source utility functions (analogous to Python utils/ folder)
+source("R/utils/color_scales.R")
+source("R/utils/make_z_list.R")
+source("R/utils/extract_subplot_data.R")
+source("R/utils/make_surface_plot.R")
+source("R/utils/calc_lifetable.R")
 
 # Source modules
 source("module_colscheme_selector.R")
@@ -35,18 +41,5 @@ if (file.exists(hmd_e0_path)) {
     mutate(gender = tolower(gender))
 }
 
-# Color palette definitions
-all_colbrew_pals <- brewer.pal.info %>%
-  as_tibble(rownames = "pal_name") %>%
-  pull(pal_name) %>%
-  str_c("RColorBrewer:", .)
-
-viridis_pals <- c(
-  "Viridis:viridis",
-  "Viridis:magma",
-  "Viridis:plasma",
-  "Viridis:inferno",
-  "Viridis:cividis"
-)
-
-all_palettes <- c(viridis_pals, all_colbrew_pals)
+# Get available palettes
+all_colbrew_pals <- get_all_palettes()

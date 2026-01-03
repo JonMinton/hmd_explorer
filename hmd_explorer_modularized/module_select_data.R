@@ -1,36 +1,33 @@
 # Data Selection Module for HMD Explorer
 # Provides UI and server for selecting country, gender, age, and year ranges
+# Implements dynamic cascading dropdowns (type -> place -> sex pattern)
 
 #' Data Selection UI
 #' @param id Module namespace ID
 #' @param allow_multiple Whether to allow multiple country selection
 #' @param select_sex Whether to show gender selection
 select_data_ui <- function(id, allow_multiple = FALSE, select_sex = TRUE) {
+
   ns <- NS(id)
 
-  sex_select_element <- if (select_sex) {
-    selectInput(
-      ns("sex_select"),
-      "Select sex of interest",
-      choices = c("Total", "Male", "Female"),
-      selected = "Total"
-    )
-  } else {
-    NULL
-  }
-
   tagList(
-    # Country selection
+    # Population type selection (cascading dropdown level 1)
     selectInput(
-      ns("code_select"),
-      "Select country of interest",
-      choices = codes_named,
-      selected = "GBR_SCO",
-      multiple = allow_multiple
+      ns("type_select"),
+      "Select population type",
+      choices = c(
+        "Countries" = "country",
+        "Regions/Subdivisions" = "region",
+        "All" = "all"
+      ),
+      selected = "country"
     ),
 
-    # Gender selection (conditional)
-    sex_select_element,
+    # Country/place selection (cascading dropdown level 2 - dynamic)
+    uiOutput(ns("dynamic_place_select")),
+
+    # Gender selection (cascading dropdown level 3 - dynamic)
+    if (select_sex) uiOutput(ns("dynamic_sex_select")) else NULL,
 
     # Year range options
     checkboxInput(
@@ -69,10 +66,46 @@ select_data_ui <- function(id, allow_multiple = FALSE, select_sex = TRUE) {
 #' Data Selection Server
 #' @param id Module namespace ID
 #' @param mode Selection mode: "standard", "sex-compare", "population"
+#' @param allow_multiple Whether to allow multiple country selection
 #' @return Reactive containing the selected and filtered data
-select_data_server <- function(id, mode = "standard") {
+select_data_server <- function(id, mode = "standard", allow_multiple = FALSE) {
   moduleServer(id, function(input, output, session) {
     ns <- session$ns
+
+    # Helper: Classify codes as country or region
+    # Regions typically have underscores (e.g., GBR_SCO, GBR_ENG)
+    classify_code <- function(code) {
+      if (grepl("_", code)) "region" else "country"
+    }
+
+    # Get available places based on type selection
+    get_places_by_type <- function(type) {
+      if (type == "all") {
+        return(codes_named)
+      }
+
+      # Filter codes_named based on type
+      code_types <- sapply(codes_named, classify_code)
+
+      if (type == "country") {
+        codes_named[code_types == "country"]
+      } else {
+        codes_named[code_types == "region"]
+      }
+    }
+
+    # Get available sexes for selected place(s)
+    get_available_sexes <- function(codes) {
+      if (is.null(codes) || length(codes) == 0) {
+        return(c("Total", "Male", "Female"))
+      }
+
+      full_data %>%
+        filter(code %in% codes) %>%
+        pull(gender) %>%
+        unique() %>%
+        sort()
+    }
 
     # Get min/max year for selected countries
     get_year_range <- function(codes) {
@@ -88,6 +121,51 @@ select_data_server <- function(id, mode = "standard") {
         ) %>%
         {c(.$min_year, .$max_year)}
     }
+
+    # Dynamic place selection (cascading from type)
+    output$dynamic_place_select <- renderUI({
+      type <- input$type_select %||% "country"
+      places <- get_places_by_type(type)
+
+      # Default selection based on type
+      default_sel <- if (type == "region" && "GBR_SCO" %in% places) {
+        "GBR_SCO"
+      } else if (length(places) > 0) {
+        places[1]
+      } else {
+        NULL
+      }
+
+      selectInput(
+        ns("code_select"),
+        "Select population",
+        choices = places,
+        selected = default_sel,
+        multiple = allow_multiple
+      )
+    })
+
+    # Dynamic sex selection (cascading from place)
+    output$dynamic_sex_select <- renderUI({
+      codes <- input$code_select
+      available_sexes <- get_available_sexes(codes)
+
+      # Default to Total if available, otherwise first available
+      default_sex <- if ("Total" %in% available_sexes) {
+        "Total"
+      } else if (length(available_sexes) > 0) {
+        available_sexes[1]
+      } else {
+        NULL
+      }
+
+      selectInput(
+        ns("sex_select"),
+        "Select sex",
+        choices = available_sexes,
+        selected = default_sex
+      )
+    })
 
     # Dynamic year slider based on snap setting
     output$dynamic_year_slider <- renderUI({

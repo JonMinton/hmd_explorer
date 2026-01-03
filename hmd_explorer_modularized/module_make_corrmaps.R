@@ -177,9 +177,20 @@ make_corrmaps_server <- function(id, data) {
 
     # Create ggplot correlation map
     plot_corrmap <- function(data_df, colscheme, scalelimit) {
+      # Ensure colscheme has a valid default
+      if (is.null(colscheme) || is.na(colscheme) || colscheme == "") {
+        colscheme <- "Viridis:viridis"
+      }
+
       parts <- str_split(colscheme, ":", simplify = TRUE)
       family <- parts[1]
       pal <- parts[2]
+
+      # Validate parsed values
+      if (is.na(family) || is.na(pal)) {
+        family <- "Viridis"
+        pal <- "viridis"
+      }
 
       p <- data_df %>%
         ggplot(aes(x = from_age, y = to_age, fill = value)) +
@@ -203,9 +214,20 @@ make_corrmaps_server <- function(id, data) {
 
     # Create plotly correlation map
     plotly_corrmap <- function(cor_matrix, colscheme, scalelimit) {
+      # Ensure colscheme has a valid default
+      if (is.null(colscheme) || is.na(colscheme) || colscheme == "") {
+        colscheme <- "Viridis:viridis"
+      }
+
       parts <- str_split(colscheme, ":", simplify = TRUE)
       family <- parts[1]
       pal <- parts[2]
+
+      # Validate parsed values
+      if (is.na(family) || is.na(pal)) {
+        family <- "Viridis"
+        pal <- "viridis"
+      }
 
       # Build color scale
       if (family == "Viridis") {
@@ -249,7 +271,7 @@ make_corrmaps_server <- function(id, data) {
     # Render ggplot correlation map
     output$corrmap <- renderPlot({
       req(data())
-      input$generate_plot
+      req(input$generate_plot)  # Wait for button click
 
       isolate({
         data() %>%
@@ -267,7 +289,7 @@ make_corrmaps_server <- function(id, data) {
     # Render plotly correlation map
     output$corrmap_plotly <- renderPlotly({
       req(data())
-      input$generate_plot
+      req(input$generate_plot)  # Wait for button click
 
       isolate({
         data() %>%
